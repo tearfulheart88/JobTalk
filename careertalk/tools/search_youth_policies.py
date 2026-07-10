@@ -6,8 +6,8 @@ Tool 3: search_youth_policies
 입력: 나이, 지역, 상황(재학/졸업/미취업)
 출력: 매칭 정책 리스트 (정책명, 지원금액, 신청자격, 마감일, 신청링크)
 
-API(기본, v2): https://www.youthcenter.go.kr/go/ythip/getPlcy — 인증키 apiKeyNm
-API(legacy):   https://www.youthcenter.go.kr/opi/youthPlcyList.do — 인증키 openApiVlak
+API(공식 기본): https://www.youthcenter.go.kr/opi/youthPlcyList.do — 인증키 openApiVlak
+API(대체 형식): https://www.youthcenter.go.kr/go/ythip/getPlcy — 인증키 apiKeyNm
 YOUTH_API_ENDPOINT 환경변수로 전환. 특징: 무료, 실시간 갱신.
 
 나이·지역·상황 필터는 API 응답의 후처리라서, 필터 통과분이 display 에 찰 때까지
@@ -18,6 +18,7 @@ API 키가 없거나 MOCK_MODE=true 면 샘플 데이터를 반환한다.
 
 from __future__ import annotations
 
+import datetime
 import json
 import logging
 import os
@@ -39,18 +40,16 @@ from .common import (
 from .formatters import policy_cards
 
 logger = logging.getLogger("careertalk.search_youth_policies")
+_KST = datetime.timezone(datetime.timedelta(hours=9), name="KST")
 
-# 온통청년 OpenAPI 는 세대가 둘이다:
-#   - v2(현행, 공공데이터포털 15143273): /go/ythip/getPlcy, 인증키 apiKeyNm,
-#     페이지 pageNum/pageSize, rtnType=json, 응답 result.youthPolicyList[]
-#   - legacy(구): /opi/youthPlcyList.do, 인증키 openApiVlak, pageIndex/display
-# 발급받은 키에 맞춰 YOUTH_API_ENDPOINT 환경변수로 전환 가능. 기본은 현행 v2.
-YOUTH_ENDPOINT_V2 = "https://www.youthcenter.go.kr/go/ythip/getPlcy"
-YOUTH_ENDPOINT_LEGACY = "https://www.youthcenter.go.kr/opi/youthPlcyList.do"
+# 공식 공개 문서는 youthPlcyList.do/openApiVlak를 안내한다. getPlcy 형식도
+# 파서 호환을 위해 유지하되 YOUTH_API_ENDPOINT를 명시했을 때만 사용한다.
+YOUTH_ENDPOINT_OFFICIAL = "https://www.youthcenter.go.kr/opi/youthPlcyList.do"
+YOUTH_ENDPOINT_ALTERNATE = "https://www.youthcenter.go.kr/go/ythip/getPlcy"
 
 
 def get_youth_endpoint() -> str:
-    return (os.getenv("YOUTH_API_ENDPOINT") or YOUTH_ENDPOINT_V2).strip() or YOUTH_ENDPOINT_V2
+    return (os.getenv("YOUTH_API_ENDPOINT") or YOUTH_ENDPOINT_OFFICIAL).strip() or YOUTH_ENDPOINT_OFFICIAL
 
 
 # ──────────────────────────────────────────────
@@ -148,8 +147,17 @@ def _mock_search(
     age: int | None, region: str, situation: str, display: int
 ) -> dict[str, Any]:
     """Mock 모드 — 간단한 필터링 후 반환."""
+    today = datetime.datetime.now(_KST).date()
+    demo_policies: list[dict[str, Any]] = []
+    for index, item in enumerate(_MOCK_POLICIES):
+        policy = dict(item)
+        policy["deadline"] = (today + datetime.timedelta(days=30 + index * 14)).isoformat()
+        policy["application_url"] = "https://www.youthcenter.go.kr/youthPolicy/ythPlcyTotalSearch"
+        policy["is_demo"] = True
+        demo_policies.append(policy)
+
     filtered = _filter_policies(
-        list(_MOCK_POLICIES),
+        demo_policies,
         age=age,
         region=region,
         situation=situation,
@@ -161,6 +169,7 @@ def _mock_search(
         "display": len(policies),
         "pageIndex": 1,
         "source": "mock",
+        "demo_data": True,
         "policies": policies,
         "kakao_cards": policy_cards(policies),
         "message": f"[Mock 모드] 청년정책 {len(policies)}건 검색 (실제 API 키 설정 시 실시간 데이터 반환)",
@@ -434,11 +443,18 @@ async def search_youth_policies(
     Returns:
         매칭 정책 리스트 (정책명, 지원금액, 신청자격, 마감일, 신청링크)
     """
+    raw_age = age
     age = _optional_int(age)
     region = str(region or "").strip()
     situation = str(situation or "").strip()
     display = _bounded_int(display, 10, 1, 100)
     page_index = _bounded_int(page_index, 1, 1, 10_000)
+    if raw_age not in (None, "") and age is None:
+        return _error_result("age는 정수여야 합니다.", "input_validation", page_index=page_index)
+    if age is not None and not 0 <= age <= 120:
+        return _error_result("age는 0~120 범위여야 합니다.", "input_validation", page_index=page_index)
+    if len(region) > 80 or len(situation) > 100:
+        return _error_result("region은 80자, situation은 100자 이하여야 합니다.", "input_validation", page_index=page_index)
 
     # ── 응답 캐시 조회 ──
     cache_on = response_cache_enabled()

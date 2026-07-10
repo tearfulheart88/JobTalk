@@ -13,6 +13,8 @@ import json
 import os
 import sys
 
+import pytest
+
 # server.py 가 있는 디렉토리를 path 에 추가
 _THIS = os.path.dirname(os.path.abspath(__file__))
 _SERVER_DIR = os.path.join(_THIS, "..", "careertalk")
@@ -35,6 +37,12 @@ PASS = 0
 FAIL = 0
 
 
+@pytest.fixture
+def anyio_backend():
+    """MCP와 동일한 asyncio 백엔드로 비동기 테스트를 실행한다."""
+    return "asyncio"
+
+
 def _ok(label: str):
     global PASS
     PASS += 1
@@ -45,8 +53,11 @@ def _fail(label: str, err: str):
     global FAIL
     FAIL += 1
     print(f"  ✗ {label} — {err}")
+    if os.environ.get("PYTEST_CURRENT_TEST"):
+        raise AssertionError(f"{label}: {err}")
 
 
+@pytest.mark.anyio
 async def test_search_jobs():
     """Tool 1: search_jobs Mock 호출."""
     print("\n[Tool 1] search_jobs")
@@ -82,6 +93,7 @@ async def test_search_jobs():
         _fail("count 제한", str(e))
 
 
+@pytest.mark.anyio
 async def test_analyze_job_fit():
     """Tool 2: analyze_job_fit Mock 호출."""
     print("\n[Tool 2] analyze_job_fit")
@@ -114,6 +126,7 @@ async def test_analyze_job_fit():
         _fail("마케팅 진로 분석", str(e))
 
 
+@pytest.mark.anyio
 async def test_search_youth_policies():
     """Tool 3: search_youth_policies Mock 호출."""
     print("\n[Tool 3] search_youth_policies")
@@ -152,6 +165,7 @@ async def test_search_youth_policies():
         _fail("display 제한", str(e))
 
 
+@pytest.mark.anyio
 async def test_generate_resume_tip():
     """Tool 4: generate_resume_tip Mock 호출."""
     print("\n[Tool 4] generate_resume_tip")
@@ -182,6 +196,7 @@ async def test_generate_resume_tip():
         _fail("빈 입력 처리", str(e))
 
 
+@pytest.mark.anyio
 async def test_server_import():
     """server.py 임포트 및 FastMCP 도구 등록 검증."""
     print("\n[Server] server.py 임포트")
@@ -196,6 +211,9 @@ async def test_server_import():
 
         # FastMCP 인스턴스 존재
         assert hasattr(mod, "mcp"), "mcp 인스턴스 없음"
+        assert mod.mcp.settings.stateless_http is True, "클라우드용 stateless_http 미설정"
+        assert mod.mcp.settings.json_response is True, "JSON response 미설정"
+        assert mod.mcp.settings.streamable_http_path == "/mcp", "MCP 경로 불일치"
         _ok("FastMCP 인스턴스 생성")
 
         # 도구 등록 확인 — FastMCP 의 tool manager 조회
@@ -231,6 +249,7 @@ async def test_server_import():
         _fail("server.py 임포트", str(e))
 
 
+@pytest.mark.anyio
 async def test_kakao_cards():
     """카카오 카드 렌더링 (기획서 §3.4 Widget) 검증."""
     print("\n[Cards] kakao_cards 렌더링")
@@ -247,6 +266,8 @@ async def test_kakao_cards():
         c = cards[0]
         assert c["type"] == "job" and c["title"], "공고 카드 형식 오류"
         assert any(b["action"] == "link" for b in c["buttons"]), "공고 카드 링크 버튼 없음"
+        assert "데모" in c["tags"], "Mock 공고 데모 표식 없음"
+        assert "mock-" not in c["buttons"][0]["value"], "존재하지 않는 Mock 상세 URL 노출"
         _ok(f"공고 카드 {len(cards)}장 (바로가기 버튼 포함)")
     except Exception as e:
         _fail("공고 카드", str(e))
@@ -267,6 +288,7 @@ async def test_kakao_cards():
         cards = r.get("kakao_cards")
         assert isinstance(cards, list) and len(cards) > 0, "정책 카드 없음"
         assert cards[0]["type"] == "policy", "정책 카드 형식 오류"
+        assert "데모" in cards[0]["tags"], "Mock 정책 데모 표식 없음"
         _ok(f"정책 카드 {len(cards)}장")
     except Exception as e:
         _fail("정책 카드", str(e))
@@ -294,6 +316,7 @@ def test_response_cache():
         cache_clear()
         k = make_cache_key("demo", a=1, b="x")
         assert make_cache_key("demo", b="x", a=1) == k, "키가 파라미터 순서에 의존"
+        assert '"b":"x"' not in k and len(k) == len("demo:") + 64, "캐시 키에 원문이 노출됨"
         assert cache_get(k) is None, "빈 캐시가 값 반환"
         cache_set(k, {"v": 42}, ttl=60)
         assert cache_get(k) == {"v": 42}, "캐시 저장/조회 실패"
@@ -377,6 +400,8 @@ def test_external_parser_resilience():
         assert "_min_age" not in policy and "_max_age" not in policy, "내부 필드 제거 실패"
         os.environ["YOUTH_API_ENDPOINT"] = " https://example.com/custom "
         assert get_youth_endpoint() == "https://example.com/custom", "온통청년 엔드포인트 동적 조회 실패"
+        os.environ.pop("YOUTH_API_ENDPOINT", None)
+        assert get_youth_endpoint().endswith("/opi/youthPlcyList.do"), "공식 온통청년 기본 엔드포인트 불일치"
         _ok("사람인 파서 + 정책 내부 필드 + 동적 엔드포인트")
     except Exception as e:
         _fail("외부 응답 파서 방어", str(e))
@@ -384,6 +409,7 @@ def test_external_parser_resilience():
         os.environ.pop("YOUTH_API_ENDPOINT", None)
 
 
+@pytest.mark.anyio
 async def test_input_hardening():
     """잘못된 숫자 입력과 외부 API 날짜/필터 보정 검증."""
     print("\n[Hardening] 입력 보정")
@@ -393,6 +419,8 @@ async def test_input_hardening():
     try:
         jobs = await search_jobs(count="bad", start="bad")
         assert jobs["count"] > 0, "잘못된 count/start 입력에서 검색 실패"
+        too_long = await search_jobs(keywords="x" * 201)
+        assert "error" in too_long, "과도하게 긴 keywords 미차단"
         assert _normalize_deadline("20260715") == "2026-07-15", "YYYYMMDD 마감일 정규화 실패"
         assert _normalize_deadline("0") == "1970-01-01", "timestamp 마감일 정규화 실패"
         _ok("채용공고 count/start + 마감일 정규화")
@@ -402,6 +430,8 @@ async def test_input_hardening():
     try:
         policies = await search_youth_policies(display="bad", page_index="bad")
         assert policies["display"] > 0, "잘못된 display/page_index 입력에서 정책 검색 실패"
+        bad_age = await search_youth_policies(age=-1)
+        assert "error" in bad_age, "잘못된 age 미차단"
         filtered = _filter_policies(
             [
                 {"policy_name": "서울 청년 교육", "region": "서울", "description": "미취업 교육", "_min_age": "19", "_max_age": "34"},
@@ -418,6 +448,7 @@ async def test_input_hardening():
         _fail("청년정책 입력 보정", str(e))
 
 
+@pytest.mark.anyio
 async def test_required_input_guards():
     """필수 입력이 비었을 때 도구가 예외 대신 명확한 error 를 반환하는지 검증."""
     print("\n[Hardening] 필수 입력 가드")
@@ -434,6 +465,7 @@ async def test_required_input_guards():
         _fail("필수 입력 가드", str(e))
 
 
+@pytest.mark.anyio
 async def test_rate_limiter():
     """레이트리미터 — 분당 한도, scope 분리, Mock 모드 비활성."""
     print("\n[Hardening] 레이트리미터")
@@ -464,6 +496,7 @@ async def test_rate_limiter():
         common.rate_limit_reset()
 
 
+@pytest.mark.anyio
 async def test_llm_failure_not_cached():
     """LLM 파싱 실패 응답은 캐시하지 않고, 성공 응답만 캐시한다."""
     print("\n[Cache] LLM 실패 미캐시 / 성공만 캐시")
@@ -521,6 +554,7 @@ async def test_llm_failure_not_cached():
         common.cache_clear()
 
 
+@pytest.mark.anyio
 async def test_dday_kst():
     """D-day 가 KST 기준으로 계산되는지."""
     print("\n[Cards] D-day KST 기준")
@@ -537,6 +571,7 @@ async def test_dday_kst():
         _fail("D-day KST", str(e))
 
 
+@pytest.mark.anyio
 async def test_mock_keyword_tokens():
     """Mock 검색이 다단어 키워드를 토큰 단위로 매칭하는지."""
     print("\n[Mock] 키워드 토큰 매칭")
@@ -553,6 +588,7 @@ async def test_mock_keyword_tokens():
         _fail("키워드 토큰 매칭", str(e))
 
 
+@pytest.mark.anyio
 async def test_policy_pagination():
     """청년정책 다중 페이지 수집 — 필터 통과분이 display 에 찰 때까지 이어서 조회."""
     print("\n[Policies] 다중 페이지 수집")

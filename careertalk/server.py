@@ -36,6 +36,8 @@ if _THIS_DIR not in sys.path:
     sys.path.insert(0, _THIS_DIR)
 
 from mcp.server.fastmcp import FastMCP  # noqa: E402
+from starlette.requests import Request  # noqa: E402
+from starlette.responses import JSONResponse  # noqa: E402
 
 from tools.search_jobs import search_jobs as _search_jobs  # noqa: E402
 from tools.analyze_job_fit import analyze_job_fit as _analyze_job_fit  # noqa: E402
@@ -81,6 +83,9 @@ mcp = FastMCP(
         "4. generate_resume_tip — 자기소개서 첨삭 + 면접 예상질문 생성\n\n"
         "모든 응답은 한국어로 제공됩니다."
     ),
+    stateless_http=True,
+    json_response=True,
+    streamable_http_path="/mcp",
 )
 
 
@@ -115,7 +120,7 @@ def server_status() -> str:
             "prompt_caching (OpenAI 자동 프리픽스 캐싱)",
             "response_cache (동일 입력 TTL 캐시 — 사람인 일일한도·LLM 비용 절감)",
             "kakao_cards (카드형 위젯 렌더링 — 진로/공고/정책/코칭)",
-            "youth_api_v2 (온통청년 현행 getPlcy + 구버전 동시 지원)",
+            "youth_api (온통청년 공식 youthPlcyList + 대체 응답 형식 파싱)",
             "async_llm (AsyncOpenAI + 타임아웃 — 이벤트 루프 비블로킹)",
             "rate_limit (외부 API·LLM 분당 호출 제한 — 비용·한도 보호)",
         ],
@@ -123,6 +128,21 @@ def server_status() -> str:
         "transport": os.environ.get("MCP_TRANSPORT", "streamable-http"),
     }
     return json.dumps(status, ensure_ascii=False, indent=2)
+
+
+@mcp.custom_route("/", methods=["GET"])
+async def root_status(_request: Request) -> JSONResponse:
+    """배포 상태와 API 키 설정 여부만 노출하는 안전한 헬스 엔드포인트."""
+    import json
+
+    payload = json.loads(server_status())
+    payload.update({"status": "ok", "version": "2.1.0", "endpoint": "/mcp"})
+    return JSONResponse(payload)
+
+
+@mcp.custom_route("/health", methods=["GET"])
+async def health_status(request: Request) -> JSONResponse:
+    return await root_status(request)
 
 
 # ──────────────────────────────────────────────
@@ -155,7 +175,9 @@ def _apply_cli_args(args: argparse.Namespace) -> tuple[str, str, int]:
     transport = os.environ.get("MCP_TRANSPORT", "streamable-http")
     host = os.environ.get("MCP_HOST", "0.0.0.0")
     try:
-        port = int(os.environ.get("MCP_PORT", "8001"))
+        port = int(os.environ.get("MCP_PORT") or os.environ.get("PORT") or "8001")
+        if not 1 <= port <= 65535:
+            raise ValueError
     except ValueError:
         port = 8001
         os.environ["MCP_PORT"] = str(port)
@@ -181,14 +203,12 @@ if __name__ == "__main__":
     print()
 
     if transport == "streamable-http":
-        try:
-            mcp.run(transport=transport, host=host, port=port)
-        except TypeError:
-            # 현재 MCP SDK 일부 버전은 run() 에 host/port 인자를 받지 않는다.
-            # streamable-http 는 Starlette 앱을 직접 uvicorn 으로 서빙해 포트를 고정한다.
-            import uvicorn
+        import uvicorn
 
-            app = mcp.streamable_http_app()
-            uvicorn.run(app, host=host, port=port)
+        uvicorn.run(mcp.streamable_http_app(), host=host, port=port)
+    elif transport == "sse":
+        import uvicorn
+
+        uvicorn.run(mcp.sse_app(), host=host, port=port)
     else:
         mcp.run(transport=transport)

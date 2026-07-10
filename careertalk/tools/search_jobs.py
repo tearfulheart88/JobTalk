@@ -18,6 +18,7 @@ from __future__ import annotations
 import datetime as _dt
 import json
 import logging
+import urllib.parse
 from typing import Any
 
 import httpx
@@ -35,6 +36,7 @@ from .common import (
 from .formatters import job_cards
 
 logger = logging.getLogger("careertalk.search_jobs")
+_KST = _dt.timezone(_dt.timedelta(hours=9), name="KST")
 
 SARAMIN_ENDPOINT = "https://oapi.saramin.co.kr/job-search"
 
@@ -113,11 +115,24 @@ _MOCK_JOBS: list[dict[str, Any]] = [
 
 def _mock_search(keywords: str, count: int) -> dict[str, Any]:
     """Mock 모드 — 키워드가 비어있으면 전체, 있으면 토큰 단위 매칭(매칭 수 내림차순)."""
+    today = _dt.datetime.now(_KST).date()
+    demo_jobs: list[dict[str, Any]] = []
+    for index, source in enumerate(_MOCK_JOBS):
+        job = dict(source)
+        searchword = keywords or str(job.get("title", "채용"))
+        job["deadline"] = (today + _dt.timedelta(days=7 + index * 4)).isoformat()
+        job["url"] = (
+            "https://www.saramin.co.kr/zf_user/search?searchword="
+            + urllib.parse.quote_plus(searchword)
+        )
+        job["is_demo"] = True
+        demo_jobs.append(job)
+
     if keywords:
         # "프론트엔드 React" 같은 다단어 검색도 동작하도록 토큰별로 매칭
         tokens = [t for t in keywords.lower().replace(",", " ").split() if t]
         scored: list[tuple[int, dict[str, Any]]] = []
-        for j in _MOCK_JOBS:
+        for j in demo_jobs:
             haystack = f"{j['title']} {j['keyword']} {j['company_name']}".lower()
             matches = sum(1 for t in tokens if t in haystack)
             if matches:
@@ -125,7 +140,7 @@ def _mock_search(keywords: str, count: int) -> dict[str, Any]:
         scored.sort(key=lambda pair: pair[0], reverse=True)
         filtered = [j for _, j in scored]
     else:
-        filtered = _MOCK_JOBS
+        filtered = demo_jobs
 
     jobs = filtered[:count]
     return {
@@ -133,6 +148,7 @@ def _mock_search(keywords: str, count: int) -> dict[str, Any]:
         "count": len(jobs),
         "start": 0,
         "source": "mock",
+        "demo_data": True,
         "jobs": jobs,
         "kakao_cards": job_cards(jobs),
         "message": f"[Mock 모드] 채용공고 {len(jobs)}건 검색 (실제 API 키 설정 시 실제 데이터 반환)",
@@ -271,6 +287,10 @@ async def search_jobs(
     edu_lv = str(edu_lv or "").strip()
     count = _bounded_int(count, 10, 1, 110)
     start = _bounded_int(start, 0, 0, 1_000_000)
+    if len(keywords) > 200:
+        return _error_result("keywords는 200자 이하여야 합니다.", "input_validation", start=start)
+    if any(len(value) > 40 for value in (loc_cd, job_mid_cd, edu_lv)):
+        return _error_result("검색 코드는 항목별 40자 이하여야 합니다.", "input_validation", start=start)
 
     # ── 응답 캐시 조회 (사람인 일일 500회 한도 보호) ──
     cache_on = response_cache_enabled()

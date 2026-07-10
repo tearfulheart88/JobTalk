@@ -20,12 +20,12 @@
 - **Prompt Caching** — OpenAI는 1024토큰 이상 동일 접두사를 자동 캐싱. 시스템 프롬프트를 맨 앞에 고정하는 것만으로 입력비용·TTFT 절감.
 - **Response Cache** — 동일 입력 재요청은 외부 API·LLM 재호출 없이 즉시 반환(TTL). 사람인 일일 500회 한도 보호 + LLM 비용 절감. Mock 모드에선 자동 비활성.
 - **Kakao 카드** — 진로/공고/정책/코칭 카드. 카카오 채널 메시지·알림톡 템플릿(basicCard/listCard)에 1:1 매핑되는 렌더러 중립 스키마.
-- **온통청년 v2** — 현행 `getPlcy`(apiKeyNm) 기본 + 구버전 `youthPlcyList.do`(openApiVlak) 동시 지원, `YOUTH_API_ENDPOINT` 로 전환.
+- **온통청년 공식 API** — 공개 문서의 `youthPlcyList.do`/`openApiVlak`를 기본으로 사용하고 대체 `getPlcy` 응답도 파싱.
 
 ## 기술 스택
 
 - **프레임워크**: Python + FastMCP (MCP Python SDK 1.26+)
-- **전송**: streamable-http (PlayMCP 등록용)
+- **전송**: stateless streamable-http + JSON response (PlayMCP/클라우드 확장용)
 - **HTTP 클라이언트**: httpx (비동기)
 - **LLM**: OpenAI (gpt-4o-mini)
 - **캐싱**: OpenAI 자동 프리픽스 캐싱 + Response Cache(동일 입력 TTL 캐시)
@@ -45,7 +45,7 @@ careertalk/
     ├── formatters.py      # Kakao 카드 포매터 (진로/공고/정책/코칭)
     ├── search_jobs.py     # Tool 1: 사람인 채용공고 검색
     ├── analyze_job_fit.py # Tool 2: LLM 진로 적성 분석
-    ├── search_youth_policies.py  # Tool 3: 온통청년 정책 검색 (v2 getPlcy + 구버전)
+    ├── search_youth_policies.py  # Tool 3: 온통청년 공식 API + 대체 응답 파싱
     └── generate_resume_tip.py    # Tool 4: LLM 자소서 첨삭
 tests/
 └── test_servers.py        # 통합 테스트 (17개 케이스)
@@ -110,9 +110,9 @@ npx @modelcontextprotocol/inspector
 
 1. https://www.data.go.kr/data/15143273/openapi.do 방문
 2. 공공데이터포털 계정으로 활용신청
-3. 인증키 발급 (무료, 제한 없음)
-   - 현행 v2(`getPlcy`)는 `apiKeyNm`, 구버전(`youthPlcyList.do`)은 `openApiVlak` 사용
-   - 발급키가 구버전이면 `.env` 의 `YOUTH_API_ENDPOINT` 를 legacy 로 교체
+3. 온통청년 승인 후 `openApiVlak` 인증키 발급 (무료, 트래픽은 기관 정책에 따름)
+   - 기본 요청 URL은 공식 제공목록의 `youthPlcyList.do`
+   - 별도로 `getPlcy` 형식 키를 받은 경우에만 `.env`의 `YOUTH_API_ENDPOINT` 변경
 
 ### LLM API
 
@@ -132,7 +132,8 @@ API 키가 설정되지 않았거나 `MOCK_MODE=true` 인 경우:
 ## 테스트
 
 ```bash
-python tests/test_servers.py
+python -m pip install -r requirements-dev.txt
+python -m pytest -q
 ```
 
 17개 테스트 케이스 검증:
@@ -190,7 +191,7 @@ docker run -p 8001:8001 --env-file .env careertalk-mcp
 | `JOBS_CACHE_TTL` | `600` | 사람인 결과 캐시 (초) |
 | `YOUTH_CACHE_TTL` | `600` | 온통청년 결과 캐시 (초) |
 | `LLM_CACHE_TTL` | `3600` | LLM 결과 캐시 (초) |
-| `YOUTH_API_ENDPOINT` | `…/go/ythip/getPlcy` | 온통청년 엔드포인트 (기본 현행 v2) |
+| `YOUTH_API_ENDPOINT` | `…/opi/youthPlcyList.do` | 온통청년 공식 공개 엔드포인트 |
 
 ## 라이선스
 

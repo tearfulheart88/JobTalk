@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import logging
 import os
 import time
@@ -214,9 +215,10 @@ def response_cache_enabled() -> bool:
 
 
 def make_cache_key(name: str, **params: Any) -> str:
-    """도구명 + 정렬된 파라미터로 안정적 캐시 키 생성."""
+    """민감한 원문을 메모리 키에 남기지 않는 안정적 SHA-256 캐시 키."""
     payload = json.dumps(params, ensure_ascii=False, sort_keys=True, default=str, separators=(",", ":"))
-    return f"{name}:{payload}"
+    digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    return f"{name}:{digest}"
 
 
 def _cache_max_entries() -> int:

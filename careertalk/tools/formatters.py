@@ -80,7 +80,7 @@ def job_cards(jobs: list[dict[str, Any]], limit: int = 5) -> list[dict[str, Any]
     cards: list[dict[str, Any]] = []
     for j in jobs[:limit]:
         dday = _dday(j.get("deadline"))
-        tags = _compact_strs([j.get("job_type"), j.get("experience"), dday])
+        tags = _compact_strs(["데모" if j.get("is_demo") else None, j.get("job_type"), j.get("experience"), dday])
         buttons = []
         if j.get("url"):
             buttons.append({"label": "지원 공고 보기", "action": "link", "value": j["url"]})
@@ -139,7 +139,7 @@ def policy_cards(policies: list[dict[str, Any]], limit: int = 5) -> list[dict[st
     cards: list[dict[str, Any]] = []
     for p in policies[:limit]:
         dday = _dday(p.get("deadline"))
-        tags = _compact_strs([p.get("category"), p.get("region"), dday])
+        tags = _compact_strs(["데모" if p.get("is_demo") else None, p.get("category"), p.get("region"), dday])
         buttons = []
         if p.get("application_url"):
             buttons.append({"label": "신청하기", "action": "link", "value": p["application_url"]})

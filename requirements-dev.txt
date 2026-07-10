@@ -1,0 +1,4 @@
+-r careertalk/requirements.txt
+
+anyio>=4.0.0,<5.0.0
+pytest>=8.0.0,<10.0.0
