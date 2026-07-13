@@ -9,17 +9,20 @@ import json
 import hashlib
 import logging
 import os
+import re
+import sqlite3
+import threading
 import time
 from collections import deque
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger("careertalk")
+_PROJECT_DIR = Path(__file__).resolve().parents[1]
 
 try:
     from dotenv import load_dotenv
-
-    _PROJECT_DIR = Path(__file__).resolve().parents[1]
 
     def _candidate_env_dirs() -> list[Path]:
         # 프로젝트 루트(careertalk_진로톡/)·실행 위치·서버 폴더(careertalk/)만 탐색.
@@ -60,6 +63,18 @@ def is_mock_mode() -> bool:
     return (os.getenv("MOCK_MODE", "false") or "").strip().lower() in ("true", "1", "yes")
 
 
+def env_bool(name: str, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in ("true", "1", "yes", "on")
+
+
+def live_api_enabled() -> bool:
+    """외부 유료·제한 API 호출은 명시적으로 허용된 경우에만 활성화한다."""
+    return not is_mock_mode() and env_bool("LIVE_API_ENABLED", False)
+
+
 def get_saramin_key() -> str | None:
     return _env_value("SARAMIN_ACCESS_KEY")
 
@@ -84,11 +99,197 @@ def llm_available() -> bool:
 
 
 def _llm_timeout() -> float:
-    """LLM 호출 타임아웃(초). 기본 30초 — 서버가 매달리는 것을 방지."""
+    """PlayMCP p99 3초 조건을 위한 LLM 타임아웃. 최대 2.5초로 제한한다."""
     try:
-        return max(1.0, float(os.getenv("LLM_TIMEOUT_SECONDS", "30")))
+        return min(2.5, max(0.5, float(os.getenv("LLM_TIMEOUT_SECONDS", "2.2"))))
     except (TypeError, ValueError):
-        return 30.0
+        return 2.2
+
+
+def external_api_timeout() -> float:
+    """외부 검색 API 타임아웃. 지연 시 빠르게 데모 응답으로 전환한다."""
+    try:
+        return min(2.5, max(0.5, float(os.getenv("EXTERNAL_API_TIMEOUT_SECONDS", "2.2"))))
+    except (TypeError, ValueError):
+        return 2.2
+
+
+def _max_output_tokens(requested: int) -> int:
+    try:
+        configured = int(os.getenv("OPENAI_MAX_OUTPUT_TOKENS", "1200"))
+    except (TypeError, ValueError):
+        configured = 1200
+    return min(max(64, requested), max(64, min(configured, 1500)))
+
+
+_SECRET_QUERY_RE = re.compile(
+    r"(?i)((?:access-key|openApiVlak|apiKeyNm|api[_-]?key)=)([^&\s'\"<>]+)"
+)
+
+
+def redact_secrets(value: Any, limit: int = 500) -> str:
+    """로그·오류 응답에서 알려진 키 값과 인증 쿼리 파라미터를 제거한다."""
+    text = _SECRET_QUERY_RE.sub(r"\1[REDACTED]", str(value))
+    for secret in (get_saramin_key(), get_youth_key(), get_openai_key()):
+        if secret:
+            text = text.replace(secret, "[REDACTED]")
+    return text[:limit]
+
+
+def safe_error_detail(error: BaseException) -> str:
+    """클라이언트에는 URL·키가 없는 예외 유형만 반환한다."""
+    return type(error).__name__
+
+
+class DailyQuotaExceeded(RuntimeError):
+    """외부 API 일일 호출 한도를 넘었을 때 사용하는 내부 예외."""
+
+
+_DAILY_LIMIT_DEFAULTS = {
+    "saramin": 400,
+    "youth": 300,
+    "openai": 100,
+}
+_DAILY_LIMIT_ENV = {
+    "saramin": "SARAMIN_DAILY_LIMIT",
+    "youth": "YOUTH_DAILY_LIMIT",
+    "openai": "OPENAI_DAILY_LIMIT",
+}
+_QUOTA_LOCK = threading.RLock()
+_INFLIGHT_LOCK = threading.Lock()
+_INFLIGHT: dict[str, int] = {}
+
+
+def _usage_db_path() -> Path:
+    configured = (os.getenv("USAGE_DB_PATH") or "").strip()
+    path = Path(configured).expanduser() if configured else _PROJECT_DIR / "data" / "usage.db"
+    if not path.is_absolute():
+        path = _PROJECT_DIR / path
+    return path.resolve()
+
+
+def _daily_limit(scope: str) -> int:
+    default = _DAILY_LIMIT_DEFAULTS.get(scope, 100)
+    env_name = _DAILY_LIMIT_ENV.get(scope, f"{scope.upper()}_DAILY_LIMIT")
+    try:
+        return max(1, int(os.getenv(env_name, "") or default))
+    except (TypeError, ValueError):
+        return default
+
+
+def _today_kst() -> str:
+    return datetime.now(timezone(timedelta(hours=9))).date().isoformat()
+
+
+def _ensure_quota_table(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS api_daily_usage (
+               usage_date TEXT NOT NULL,
+               scope TEXT NOT NULL,
+               call_count INTEGER NOT NULL,
+               PRIMARY KEY (usage_date, scope)
+           )"""
+    )
+
+
+def consume_daily_quota(scope: str) -> str | None:
+    """SQLite 트랜잭션으로 실제 외부 요청 1회를 원자적으로 예약한다."""
+    if not live_api_enabled():
+        return "실시간 외부 API 호출이 비활성화되어 있습니다."
+    if not env_bool("DAILY_QUOTA_ENABLED", True):
+        return None
+
+    limit = _daily_limit(scope)
+    db_path = _usage_db_path()
+    try:
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        with _QUOTA_LOCK, sqlite3.connect(str(db_path), timeout=0.15) as conn:
+            conn.execute("PRAGMA busy_timeout = 150")
+            _ensure_quota_table(conn)
+            conn.commit()
+            conn.execute("BEGIN IMMEDIATE")
+            today = _today_kst()
+            row = conn.execute(
+                "SELECT call_count FROM api_daily_usage WHERE usage_date = ? AND scope = ?",
+                (today, scope),
+            ).fetchone()
+            used = int(row[0]) if row else 0
+            if used >= limit:
+                conn.rollback()
+                logger.warning("일일 API 한도 초과 (scope=%s, limit=%d)", scope, limit)
+                return f"오늘의 외부 API 사용 한도에 도달했습니다. ({scope} {limit}회/일)"
+            conn.execute(
+                """INSERT INTO api_daily_usage (usage_date, scope, call_count)
+                   VALUES (?, ?, 1)
+                   ON CONFLICT(usage_date, scope)
+                   DO UPDATE SET call_count = call_count + 1""",
+                (today, scope),
+            )
+            conn.commit()
+    except (OSError, sqlite3.Error) as error:
+        logger.error("API 사용량 저장소 오류로 외부 호출 차단 (%s)", type(error).__name__)
+        return "API 사용량 보호 상태를 확인할 수 없어 외부 호출을 중단했습니다."
+    return None
+
+
+def daily_quota_reset(scope: str | None = None) -> None:
+    """테스트·운영 초기화용. 기본적으로 오늘 사용량만 제거한다."""
+    db_path = _usage_db_path()
+    if not db_path.exists():
+        return
+    with _QUOTA_LOCK, sqlite3.connect(str(db_path), timeout=0.15) as conn:
+        _ensure_quota_table(conn)
+        if scope:
+            conn.execute(
+                "DELETE FROM api_daily_usage WHERE usage_date = ? AND scope = ?",
+                (_today_kst(), scope),
+            )
+        else:
+            conn.execute("DELETE FROM api_daily_usage WHERE usage_date = ?", (_today_kst(),))
+        conn.commit()
+
+
+def _concurrency_limit(scope: str) -> int:
+    env_name = "OPENAI_MAX_CONCURRENCY" if scope == "openai" else "EXTERNAL_API_MAX_CONCURRENCY"
+    default = 2 if scope == "openai" else 4
+    try:
+        return max(1, int(os.getenv(env_name, "") or default))
+    except (TypeError, ValueError):
+        return default
+
+
+def acquire_call_slot(scope: str) -> str | None:
+    """대기열을 만들지 않고 즉시 거절해 p99 지연과 동시 비용 폭증을 막는다."""
+    if not live_api_enabled():
+        return "실시간 외부 API 호출이 비활성화되어 있습니다."
+    with _INFLIGHT_LOCK:
+        current = _INFLIGHT.get(scope, 0)
+        limit = _concurrency_limit(scope)
+        if current >= limit:
+            return f"외부 API 요청이 처리 중입니다. 잠시 후 다시 시도해주세요. (동시 {limit}회 제한)"
+        _INFLIGHT[scope] = current + 1
+    return None
+
+
+def release_call_slot(scope: str) -> None:
+    with _INFLIGHT_LOCK:
+        current = _INFLIGHT.get(scope, 0)
+        if current <= 1:
+            _INFLIGHT.pop(scope, None)
+        else:
+            _INFLIGHT[scope] = current - 1
+
+
+def reserve_live_call(scope: str) -> str | None:
+    """동시 호출 슬롯과 일일 쿼터를 순서대로 예약한다."""
+    denied = acquire_call_slot(scope)
+    if denied:
+        return denied
+    denied = consume_daily_quota(scope)
+    if denied:
+        release_call_slot(scope)
+        return denied
+    return None
 
 
 async def call_llm(
@@ -113,15 +314,19 @@ async def call_llm(
       - 경량 모델 기본값(gpt-4o-mini)으로 비용·지연 최소화.
     """
     provider = get_llm_provider()
-    if provider == "openai":
+    if provider == "openai" and live_api_enabled():
         model_name = model or os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+        denied = reserve_live_call("openai")
+        if denied:
+            logger.warning("LLM 호출 보호 폴백: %s", denied)
+            return ""
         try:
             from openai import AsyncOpenAI
 
             client = AsyncOpenAI(
                 api_key=get_openai_key(),
                 timeout=_llm_timeout(),
-                max_retries=1,
+                max_retries=0,
             )
             kwargs: dict[str, Any] = {
                 "model": model_name,
@@ -130,31 +335,23 @@ async def call_llm(
                     {"role": "user", "content": user_prompt},
                 ],
                 "temperature": temperature,
-                "max_tokens": max_tokens,
+                "max_tokens": _max_output_tokens(max_tokens),
             }
             if json_mode:
                 kwargs["response_format"] = {"type": "json_object"}
 
-            try:
-                # OpenAI 는 1024토큰 이상 동일 접두사를 자동 캐싱(시스템 프롬프트를 맨 앞에 고정).
-                resp = await client.chat.completions.create(**kwargs)
-            except Exception as first_error:
-                if not json_mode:
-                    raise
-                # 일부 모델은 response_format 미지원 — JSON 모드 없이 1회 재시도.
-                logger.warning(
-                    "LLM JSON 모드 호출 실패(%s: %s) — response_format 없이 재시도",
-                    type(first_error).__name__, first_error,
-                )
-                kwargs.pop("response_format", None)
-                resp = await client.chat.completions.create(**kwargs)
+            # PlayMCP p99 3초 조건 때문에 네트워크 재시도 없이 즉시 폴백한다.
+            resp = await client.chat.completions.create(**kwargs)
             return resp.choices[0].message.content or ""
-        except Exception as e:
+        except Exception as error:
             logger.warning(
-                "LLM 호출 실패 — Mock 폴백 (model=%s, %s: %s)",
-                model_name, type(e).__name__, e,
+                "LLM 호출 실패 - Mock 폴백 (model=%s, error=%s)",
+                model_name,
+                type(error).__name__,
             )
             return ""
+        finally:
+            release_call_slot("openai")
 
     return ""
 
@@ -209,7 +406,7 @@ _RESPONSE_CACHE: dict[str, tuple[float, Any]] = {}
 
 def response_cache_enabled() -> bool:
     """Mock 모드에서는 데모 일관성을 위해 캐시를 끈다."""
-    if is_mock_mode():
+    if not live_api_enabled():
         return False
     return (os.getenv("RESPONSE_CACHE_ENABLED", "true") or "").strip().lower() in ("true", "1", "yes")
 
@@ -293,7 +490,7 @@ _RATE_DEFAULTS = {"llm": 10, "external": 30}
 
 
 def rate_limit_enabled() -> bool:
-    if is_mock_mode():
+    if not live_api_enabled():
         return False
     return (os.getenv("RATE_LIMIT_ENABLED", "true") or "").strip().lower() in ("true", "1", "yes")
 

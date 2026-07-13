@@ -27,11 +27,17 @@ from .common import (
     cache_get,
     cache_set,
     env_ttl,
+    external_api_timeout,
     get_saramin_key,
     is_mock_mode,
+    live_api_enabled,
     make_cache_key,
     rate_limit_exceeded,
+    redact_secrets,
+    release_call_slot,
+    reserve_live_call,
     response_cache_enabled,
+    safe_error_detail,
 )
 from .formatters import job_cards
 
@@ -285,7 +291,7 @@ async def search_jobs(
     loc_cd = str(loc_cd or "").strip()
     job_mid_cd = str(job_mid_cd or "").strip()
     edu_lv = str(edu_lv or "").strip()
-    count = _bounded_int(count, 10, 1, 110)
+    count = _bounded_int(count, 10, 1, 10)
     start = _bounded_int(start, 0, 0, 1_000_000)
     if len(keywords) > 200:
         return _error_result("keywords는 200자 이하여야 합니다.", "input_validation", start=start)
@@ -304,13 +310,17 @@ async def search_jobs(
             return cached
 
     # ── Mock 모드 ──
-    if is_mock_mode() or not get_saramin_key():
+    if is_mock_mode() or not live_api_enabled() or not get_saramin_key():
         return _mock_search(keywords, count)
 
     # ── 레이트리밋 (사람인 일일 500회 한도 보호 — 캐시 히트는 위에서 반환됨) ──
     limited = rate_limit_exceeded("external")
     if limited:
         return _error_result(limited, "rate_limited", start=start)
+
+    denied = reserve_live_call("saramin")
+    if denied:
+        return _error_result(denied, "usage_guard", start=start)
 
     # ── 실제 API 호출 ──
     params: dict[str, Any] = {
@@ -330,7 +340,7 @@ async def search_jobs(
     headers = {"Accept": "application/json"}
 
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
+        async with httpx.AsyncClient(timeout=external_api_timeout()) as client:
             resp = await client.get(
                 SARAMIN_ENDPOINT, params=params, headers=headers
             )
@@ -338,10 +348,21 @@ async def search_jobs(
             data = resp.json()
     except httpx.HTTPStatusError as e:
         logger.warning("사람인 API HTTP 오류: %s (keywords=%r)", e.response.status_code, keywords)
-        return _error_result(f"사람인 API HTTP 오류: {e.response.status_code}", str(e), start=start)
+        return _error_result(
+            f"사람인 API HTTP 오류: {e.response.status_code}", safe_error_detail(e), start=start
+        )
     except (httpx.RequestError, json.JSONDecodeError) as e:
-        logger.warning("사람인 API 요청 실패: %s: %s (keywords=%r)", type(e).__name__, e, keywords)
-        return _error_result(f"사람인 API 요청 실패: {type(e).__name__}", str(e), start=start)
+        logger.warning(
+            "사람인 API 요청 실패: %s: %s (keywords=%r)",
+            type(e).__name__,
+            redact_secrets(e),
+            keywords,
+        )
+        return _error_result(
+            f"사람인 API 요청 실패: {type(e).__name__}", safe_error_detail(e), start=start
+        )
+    finally:
+        release_call_slot("saramin")
 
     jobs = _parse_saramin_response(data)
     jobs_meta = _as_dict(data.get("jobs", {}))

@@ -36,6 +36,7 @@ if _THIS_DIR not in sys.path:
     sys.path.insert(0, _THIS_DIR)
 
 from mcp.server.fastmcp import FastMCP  # noqa: E402
+from mcp.types import ToolAnnotations  # noqa: E402
 from starlette.requests import Request  # noqa: E402
 from starlette.responses import JSONResponse  # noqa: E402
 
@@ -45,6 +46,7 @@ from tools.search_youth_policies import search_youth_policies as _search_youth_p
 from tools.generate_resume_tip import generate_resume_tip as _generate_resume_tip  # noqa: E402
 from tools.common import (  # noqa: E402
     is_mock_mode,
+    live_api_enabled,
     get_saramin_key,
     get_youth_key,
     llm_available,
@@ -61,6 +63,8 @@ logging.basicConfig(
 def _runtime_mode() -> str:
     if is_mock_mode():
         return "mock"
+    if not live_api_enabled():
+        return "safe_fallback"
     configured = [bool(get_saramin_key()), bool(get_youth_key()), bool(llm_available())]
     if all(configured):
         return "live"
@@ -90,13 +94,49 @@ mcp = FastMCP(
 
 
 # ──────────────────────────────────────────────
-# Tool 등록 — tools/ 모듈의 함수를 직접 등록한다.
-# 시그니처·docstring(파라미터 설명 포함)은 각 모듈이 단일 소스.
+# Tool 등록 - PlayMCP 필수 annotations 5개와 영문 설명을 명시한다.
 # ──────────────────────────────────────────────
-mcp.tool()(_search_jobs)             # Tool 1: 맞춤 채용공고 검색 (사람인 OpenAPI)
-mcp.tool()(_analyze_job_fit)         # Tool 2: AI 진로 적성 진단 및 직무 추천 (LLM)
-mcp.tool()(_search_youth_policies)   # Tool 3: 청년정책·지원금 매칭 (온통청년 OpenAPI)
-mcp.tool()(_generate_resume_tip)     # Tool 4: 자소서 첨삭 + 면접 예상질문 (LLM)
+def _read_only_annotations(title: str) -> ToolAnnotations:
+    return ToolAnnotations(
+        title=title,
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=True,
+    )
+
+mcp.tool(
+    title="Search Jobs | 채용공고 검색",
+    description=(
+        "Searches live or clearly labeled demo job listings for CareerTalk(진로톡) "
+        "using job keywords, location, role, and education filters."
+    ),
+    annotations=_read_only_annotations("Search Jobs | 채용공고 검색"),
+)(_search_jobs)
+mcp.tool(
+    title="Analyze Career Fit | 직무 적합도 분석",
+    description=(
+        "Analyzes a user profile and recommends five career paths for CareerTalk(진로톡); "
+        "uses a protected LLM call or a deterministic fallback."
+    ),
+    annotations=_read_only_annotations("Analyze Career Fit | 직무 적합도 분석"),
+)(_analyze_job_fit)
+mcp.tool(
+    title="Search Youth Policies | 청년정책 검색",
+    description=(
+        "Searches live or clearly labeled demo youth support policies for CareerTalk(진로톡) "
+        "by age, region, and employment situation."
+    ),
+    annotations=_read_only_annotations("Search Youth Policies | 청년정책 검색"),
+)(_search_youth_policies)
+mcp.tool(
+    title="Generate Resume Tips | 자소서 첨삭",
+    description=(
+        "Generates resume revisions and interview preparation tips for CareerTalk(진로톡); "
+        "uses a protected LLM call or a deterministic fallback."
+    ),
+    annotations=_read_only_annotations("Generate Resume Tips | 자소서 첨삭"),
+)(_generate_resume_tip)
 
 
 # ──────────────────────────────────────────────
@@ -111,6 +151,7 @@ def server_status() -> str:
         "server": "CareerTalk MCP",
         "tools": ["search_jobs", "analyze_job_fit", "search_youth_policies", "generate_resume_tip"],
         "mode": _runtime_mode(),
+        "live_api_enabled": live_api_enabled(),
         "api_keys": {
             "saramin": "configured" if get_saramin_key() else "missing (using mock)",
             "youth_center": "configured" if get_youth_key() else "missing (using mock)",
@@ -123,6 +164,8 @@ def server_status() -> str:
             "youth_api (온통청년 공식 youthPlcyList + 대체 응답 형식 파싱)",
             "async_llm (AsyncOpenAI + 타임아웃 — 이벤트 루프 비블로킹)",
             "rate_limit (외부 API·LLM 분당 호출 제한 — 비용·한도 보호)",
+            "daily_quota (SQLite 기반 일일 호출 하드 가드)",
+            "secret_redaction (오류·로그의 키 및 인증 URL 제거)",
         ],
         "rate_limit": "enabled" if rate_limit_enabled() else "disabled",
         "transport": os.environ.get("MCP_TRANSPORT", "streamable-http"),
@@ -136,7 +179,7 @@ async def root_status(_request: Request) -> JSONResponse:
     import json
 
     payload = json.loads(server_status())
-    payload.update({"status": "ok", "version": "2.1.0", "endpoint": "/mcp"})
+    payload.update({"status": "ok", "version": "2.2.0", "endpoint": "/mcp"})
     return JSONResponse(payload)
 
 
@@ -158,13 +201,19 @@ def _parse_args() -> argparse.Namespace:
         choices=["stdio", "sse", "streamable-http"],
         help="MCP 전송 방식 (기본: MCP_TRANSPORT 또는 streamable-http)",
     )
-    parser.add_argument("--mock", action="store_true", help="외부 API 키 없이 샘플 데이터로 실행")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--mock", action="store_true", help="외부 API 키 없이 샘플 데이터로 실행")
+    mode.add_argument("--live", action="store_true", help="명시적으로 보호된 외부 API 호출 활성화")
     return parser.parse_args()
 
 
 def _apply_cli_args(args: argparse.Namespace) -> tuple[str, str, int]:
     if args.mock:
         os.environ["MOCK_MODE"] = "true"
+        os.environ["LIVE_API_ENABLED"] = "false"
+    elif args.live:
+        os.environ["MOCK_MODE"] = "false"
+        os.environ["LIVE_API_ENABLED"] = "true"
     if args.transport:
         os.environ["MCP_TRANSPORT"] = args.transport
     if args.host:

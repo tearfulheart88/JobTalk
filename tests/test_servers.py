@@ -12,6 +12,7 @@ import asyncio
 import json
 import os
 import sys
+import tempfile
 
 import pytest
 
@@ -228,6 +229,16 @@ async def test_server_import():
                 _fail("도구 등록", f"누락: {missing}")
             else:
                 _ok(f"4개 Tool 등록 확인: {', '.join(sorted(found))}")
+            for tool in tools:
+                annotations = tool.annotations
+                assert annotations is not None, f"{tool.name}: annotations 누락"
+                assert annotations.title, f"{tool.name}: annotations.title 누락"
+                assert annotations.readOnlyHint is True, f"{tool.name}: readOnlyHint 오류"
+                assert annotations.destructiveHint is False, f"{tool.name}: destructiveHint 오류"
+                assert annotations.idempotentHint is True, f"{tool.name}: idempotentHint 오류"
+                assert annotations.openWorldHint is True, f"{tool.name}: openWorldHint 오류"
+                assert "CareerTalk(진로톡)" in (tool.description or ""), f"{tool.name}: 영문 설명 누락"
+            _ok("PlayMCP annotations 5개 + 서비스명 포함 영문 설명")
         except Exception as e:
             # list_tools() API 가 다를 수 있음 — _tool_manager 로 폴백
             try:
@@ -472,8 +483,10 @@ async def test_rate_limiter():
     from tools import common
 
     old_mock = os.environ.get("MOCK_MODE")
+    old_live = os.environ.get("LIVE_API_ENABLED")
     try:
         os.environ["MOCK_MODE"] = "false"
+        os.environ["LIVE_API_ENABLED"] = "true"
         os.environ["RATE_LIMIT_PER_MINUTE"] = "2"
         common.rate_limit_reset()
         assert common.rate_limit_exceeded("external") is None, "1회차가 제한됨"
@@ -492,6 +505,10 @@ async def test_rate_limiter():
         _fail("레이트리미터", str(e))
     finally:
         os.environ["MOCK_MODE"] = old_mock or "true"
+        if old_live is None:
+            os.environ.pop("LIVE_API_ENABLED", None)
+        else:
+            os.environ["LIVE_API_ENABLED"] = old_live
         os.environ.pop("RATE_LIMIT_PER_MINUTE", None)
         common.rate_limit_reset()
 
@@ -506,6 +523,7 @@ async def test_llm_failure_not_cached():
     from tools import common
 
     old_mock = os.environ.get("MOCK_MODE")
+    old_live = os.environ.get("LIVE_API_ENABLED")
     calls = {"n": 0}
 
     async def fake_bad_llm(*args, **kwargs):
@@ -525,6 +543,7 @@ async def test_llm_failure_not_cached():
     orig_rate = ajf.rate_limit_exceeded
     try:
         os.environ["MOCK_MODE"] = "false"
+        os.environ["LIVE_API_ENABLED"] = "true"
         common.cache_clear()
         ajf.get_llm_provider = lambda: "openai"
         ajf.rate_limit_exceeded = lambda scope: None
@@ -551,7 +570,82 @@ async def test_llm_failure_not_cached():
         ajf.get_llm_provider = orig_provider
         ajf.rate_limit_exceeded = orig_rate
         os.environ["MOCK_MODE"] = old_mock or "true"
+        if old_live is None:
+            os.environ.pop("LIVE_API_ENABLED", None)
+        else:
+            os.environ["LIVE_API_ENABLED"] = old_live
         common.cache_clear()
+
+
+def test_live_api_usage_guards():
+    """실시간 API는 명시적 opt-in, 영속 일일 한도, 동시 호출 제한을 모두 통과해야 한다."""
+    print("\n[Hardening] 실시간 API 사용량 보호")
+    from tools import common
+
+    keys = (
+        "MOCK_MODE", "LIVE_API_ENABLED", "USAGE_DB_PATH", "OPENAI_DAILY_LIMIT",
+        "OPENAI_MAX_CONCURRENCY", "LLM_TIMEOUT_SECONDS", "EXTERNAL_API_TIMEOUT_SECONDS",
+    )
+    original = {key: os.environ.get(key) for key in keys}
+    try:
+        os.environ["MOCK_MODE"] = "false"
+        os.environ.pop("LIVE_API_ENABLED", None)
+        assert common.live_api_enabled() is False, "opt-in 없이 실시간 API가 활성화됨"
+
+        os.environ["LIVE_API_ENABLED"] = "true"
+        os.environ["OPENAI_DAILY_LIMIT"] = "2"
+        os.environ["OPENAI_MAX_CONCURRENCY"] = "1"
+        os.environ["LLM_TIMEOUT_SECONDS"] = "99"
+        os.environ["EXTERNAL_API_TIMEOUT_SECONDS"] = "99"
+        with tempfile.TemporaryDirectory(prefix="jobtalk_quota_") as tmp:
+            os.environ["USAGE_DB_PATH"] = os.path.join(tmp, "usage.db")
+            assert common.consume_daily_quota("openai") is None, "일일 한도 1회차 차단"
+            assert common.consume_daily_quota("openai") is None, "일일 한도 2회차 차단"
+            assert common.consume_daily_quota("openai") is not None, "일일 한도 초과 미차단"
+            common.daily_quota_reset("openai")
+            assert common.consume_daily_quota("openai") is None, "쿼터 초기화 실패"
+
+        assert common.acquire_call_slot("openai") is None, "첫 동시 호출 슬롯 차단"
+        assert common.acquire_call_slot("openai") is not None, "동시 호출 초과 미차단"
+        common.release_call_slot("openai")
+        assert common.acquire_call_slot("openai") is None, "호출 슬롯 반환 실패"
+        common.release_call_slot("openai")
+        assert common._llm_timeout() == 2.5, "LLM 타임아웃 상한 미적용"
+        assert common.external_api_timeout() == 2.5, "외부 API 타임아웃 상한 미적용"
+        _ok("명시적 opt-in + SQLite 일일 한도 + 동시 호출 + 2.5초 상한")
+    except Exception as e:
+        _fail("실시간 API 사용량 보호", str(e))
+    finally:
+        common.release_call_slot("openai")
+        for key, value in original.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+
+
+def test_secret_redaction():
+    """인증 쿼리와 실제 환경변수 키가 오류·로그 문자열에 남지 않는다."""
+    print("\n[Hardening] API 비밀값 마스킹")
+    from tools import common
+
+    old_key = os.environ.get("SARAMIN_ACCESS_KEY")
+    try:
+        os.environ["SARAMIN_ACCESS_KEY"] = "super-secret-value"
+        raw = "https://example.test/jobs?access-key=super-secret-value&apiKey=other-secret"
+        redacted = common.redact_secrets(raw)
+        assert "super-secret-value" not in redacted and "other-secret" not in redacted
+        assert redacted.count("[REDACTED]") >= 2, redacted
+        error = RuntimeError(raw)
+        assert common.safe_error_detail(error) == "RuntimeError"
+        _ok("URL 인증 파라미터 + 실제 키 제거, 클라이언트에는 예외 유형만 반환")
+    except Exception as e:
+        _fail("API 비밀값 마스킹", str(e))
+    finally:
+        if old_key is None:
+            os.environ.pop("SARAMIN_ACCESS_KEY", None)
+        else:
+            os.environ["SARAMIN_ACCESS_KEY"] = old_key
 
 
 @pytest.mark.anyio
@@ -670,6 +764,8 @@ async def main():
     await test_required_input_guards()
     await test_rate_limiter()
     await test_llm_failure_not_cached()
+    test_live_api_usage_guards()
+    test_secret_redaction()
     await test_dday_kst()
     await test_mock_keyword_tokens()
     await test_policy_pagination()

@@ -22,6 +22,7 @@ from .common import (
     env_ttl,
     get_llm_provider,
     is_mock_mode,
+    live_api_enabled,
     make_cache_key,
     parse_json_object,
     rate_limit_exceeded,
@@ -230,7 +231,7 @@ async def generate_resume_tip(
             return cached
 
     # ── Mock 모드 ──
-    if is_mock_mode() or not get_llm_provider():
+    if is_mock_mode() or not live_api_enabled() or not get_llm_provider():
         return _mock_resume_tip(resume_text, target_job, company_name)
 
     # ── 레이트리밋 (LLM 비용 보호 — 캐시 히트는 여기 오기 전에 반환됨) ──
@@ -268,7 +269,7 @@ async def generate_resume_tip(
         system_prompt=_SYSTEM_PROMPT,
         user_prompt=user_prompt,
         temperature=0.4,
-        max_tokens=2000,
+        max_tokens=1200,
         json_mode=True,
     )
 

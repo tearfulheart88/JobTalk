@@ -18,6 +18,7 @@ API 키가 없거나 MOCK_MODE=true 면 샘플 데이터를 반환한다.
 
 from __future__ import annotations
 
+import asyncio
 import datetime
 import json
 import logging
@@ -28,14 +29,22 @@ from typing import Any
 import httpx
 
 from .common import (
+    DailyQuotaExceeded,
+    acquire_call_slot,
     cache_get,
     cache_set,
+    consume_daily_quota,
     env_ttl,
+    external_api_timeout,
     get_youth_key,
     is_mock_mode,
+    live_api_enabled,
     make_cache_key,
     rate_limit_exceeded,
+    redact_secrets,
+    release_call_slot,
     response_cache_enabled,
+    safe_error_detail,
 )
 from .formatters import policy_cards
 
@@ -374,6 +383,8 @@ async def _collect_filtered(
             break
         try:
             items, total = await fetch_page(page)
+        except DailyQuotaExceeded:
+            raise
         except Exception:
             if pages_fetched == 0:
                 raise
@@ -447,7 +458,7 @@ async def search_youth_policies(
     age = _optional_int(age)
     region = str(region or "").strip()
     situation = str(situation or "").strip()
-    display = _bounded_int(display, 10, 1, 100)
+    display = _bounded_int(display, 10, 1, 10)
     page_index = _bounded_int(page_index, 1, 1, 10_000)
     if raw_age not in (None, "") and age is None:
         return _error_result("age는 정수여야 합니다.", "input_validation", page_index=page_index)
@@ -468,13 +479,17 @@ async def search_youth_policies(
             return cached
 
     # ── Mock 모드 ──
-    if is_mock_mode() or not get_youth_key():
+    if is_mock_mode() or not live_api_enabled() or not get_youth_key():
         return _mock_search(age, region, situation, display)
 
     # ── 레이트리밋 (캐시 히트는 위에서 반환됨) ──
     limited = rate_limit_exceeded("external")
     if limited:
         return _error_result(limited, "rate_limited", page_index=page_index)
+
+    denied = acquire_call_slot("youth")
+    if denied:
+        return _error_result(denied, "usage_guard", page_index=page_index)
 
     # ── 실제 API 호출 (엔드포인트 세대에 맞춰 파라미터 구성) ──
     endpoint = get_youth_endpoint()
@@ -505,9 +520,12 @@ async def search_youth_policies(
         return built
 
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
+        async with httpx.AsyncClient(timeout=external_api_timeout()) as client:
 
             async def fetch_page(page: int) -> tuple[list[dict[str, Any]], int | None]:
+                quota_error = consume_daily_quota("youth")
+                if quota_error:
+                    raise DailyQuotaExceeded(quota_error)
                 resp = await client.get(endpoint, params=_build_params(page))
                 resp.raise_for_status()
                 # JSON 시도, 실패 시 XML 로 파싱
@@ -518,21 +536,43 @@ async def search_youth_policies(
                 return _parse_youth_response(data), _api_total(data)
 
             # 후처리 필터로 건수가 줄어도 display 를 최대한 채우도록 연속 페이지 조회
-            collected, api_total, pages_fetched = await _collect_filtered(
-                fetch_page,
-                age=age,
-                region=region,
-                situation=situation,
-                display=display,
-                page_index=page_index,
-                max_pages=_max_fetch_pages(),
+            collected, api_total, pages_fetched = await asyncio.wait_for(
+                _collect_filtered(
+                    fetch_page,
+                    age=age,
+                    region=region,
+                    situation=situation,
+                    display=display,
+                    page_index=page_index,
+                    max_pages=_max_fetch_pages(),
+                ),
+                timeout=external_api_timeout(),
             )
+    except DailyQuotaExceeded as e:
+        return _error_result(str(e), "daily_quota", page_index=page_index)
+    except asyncio.TimeoutError as e:
+        logger.warning("온통청년 API 전체 요청 시간 초과 (region=%r, situation=%r)", region, situation)
+        return _error_result(
+            "온통청년 API 응답 시간이 초과되었습니다.", safe_error_detail(e), page_index=page_index
+        )
     except httpx.HTTPStatusError as e:
         logger.warning("온통청년 API HTTP 오류: %s (region=%r, situation=%r)", e.response.status_code, region, situation)
-        return _error_result(f"온통청년 API HTTP 오류: {e.response.status_code}", str(e), page_index=page_index)
+        return _error_result(
+            f"온통청년 API HTTP 오류: {e.response.status_code}", safe_error_detail(e), page_index=page_index
+        )
     except httpx.RequestError as e:
-        logger.warning("온통청년 API 요청 실패: %s: %s (region=%r, situation=%r)", type(e).__name__, e, region, situation)
-        return _error_result(f"온통청년 API 요청 실패: {type(e).__name__}", str(e), page_index=page_index)
+        logger.warning(
+            "온통청년 API 요청 실패: %s: %s (region=%r, situation=%r)",
+            type(e).__name__,
+            redact_secrets(e),
+            region,
+            situation,
+        )
+        return _error_result(
+            f"온통청년 API 요청 실패: {type(e).__name__}", safe_error_detail(e), page_index=page_index
+        )
+    finally:
+        release_call_slot("youth")
 
     has_more = len(collected) > display
     policies = [_strip_internal_fields(policy) for policy in collected[:display]]

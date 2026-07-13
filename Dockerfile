@@ -4,7 +4,10 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONUTF8=1 \
     LANG=C.UTF-8 \
     MCP_HOST=0.0.0.0 \
-    MCP_TRANSPORT=streamable-http
+    MCP_TRANSPORT=streamable-http \
+    MOCK_MODE=true \
+    LIVE_API_ENABLED=false \
+    USAGE_DB_PATH=/app/data/usage.db
 
 WORKDIR /app
 
@@ -14,6 +17,7 @@ RUN pip install --no-cache-dir --upgrade pip \
 
 COPY careertalk/ .
 RUN useradd --create-home --uid 10001 appuser \
+    && mkdir -p /app/data \
     && chown -R appuser:appuser /app
 
 USER appuser

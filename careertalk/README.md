@@ -48,7 +48,7 @@ careertalk/
     ├── search_youth_policies.py  # Tool 3: 온통청년 공식 API + 대체 응답 파싱
     └── generate_resume_tip.py    # Tool 4: LLM 자소서 첨삭
 tests/
-└── test_servers.py        # 통합 테스트 (17개 케이스)
+└── test_servers.py        # 통합·보안 회귀 테스트
 ```
 
 ## 설치 및 실행
@@ -80,8 +80,8 @@ cp .env.example .env
 ```bash
 python server.py --mock --port 8001
 
-# 실제 API 키를 쓸 때:
-python server.py --port 8001
+# Secret 환경변수를 지원하는 서버에서 실제 API 키를 쓸 때:
+python server.py --live --port 8001
 
 # 환경변수 방식도 지원:
 MCP_PORT=8001 MOCK_MODE=true python server.py
@@ -120,7 +120,7 @@ npx @modelcontextprotocol/inspector
 
 ## Mock 모드 동작
 
-API 키가 설정되지 않았거나 `MOCK_MODE=true` 인 경우:
+API 키가 설정되지 않았거나 `MOCK_MODE=true` 또는 `LIVE_API_ENABLED=false`인 경우:
 
 | 도구 | Mock 동작 |
 |------|-----------|
@@ -136,7 +136,7 @@ python -m pip install -r requirements-dev.txt
 python -m pytest -q
 ```
 
-17개 테스트 케이스 검증:
+pytest 19개와 직접 통합 검증 35개를 실행합니다:
 - server.py 임포트 + 4개 Tool 등록 확인
 - search_jobs: 기본 검색, 키워드 필터, count 제한
 - analyze_job_fit: IT/비IT 진로 분석
@@ -183,7 +183,12 @@ docker run -p 8001:8001 --env-file .env careertalk-mcp
 | `YOUTH_OPEN_API_KEY` | (없음) | 온통청년 OpenAPI openApiVlak |
 | `OPENAI_API_KEY` | (없음) | OpenAI API 키 (LLM) |
 | `OPENAI_MODEL` | `gpt-4o-mini` | OpenAI 모델명 |
-| `MOCK_MODE` | `false` | true 시 외부 API 없이 샘플 데이터 반환 |
+| `MOCK_MODE` | `true` | true 시 외부 API 없이 샘플 데이터 반환 |
+| `LIVE_API_ENABLED` | `false` | `MOCK_MODE=false`와 함께 설정할 때만 실시간 API 허용 |
+| `USAGE_DB_PATH` | `data/usage.db` | 일일 API 사용량 SQLite 저장소 |
+| `SARAMIN_DAILY_LIMIT` | `400` | 사람인 인스턴스별 일일 하드 가드 |
+| `YOUTH_DAILY_LIMIT` | `300` | 온통청년 인스턴스별 일일 하드 가드 |
+| `OPENAI_DAILY_LIMIT` | `100` | OpenAI 인스턴스별 일일 하드 가드 |
 | `MCP_TRANSPORT` | `streamable-http` | MCP 전송 방식 |
 | `MCP_HOST` | `0.0.0.0` | 서버 바인딩 호스트 |
 | `MCP_PORT` | `8001` | 서버 포트 |
