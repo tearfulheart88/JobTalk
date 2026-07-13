@@ -3,11 +3,12 @@ CareerTalk MCP Server
 =====================
 청년 진로·취업 AI 멘토 — MCP(Model Context Protocol) 서버
 
-4개 Tool 제공:
+5개 Tool 제공:
   1. search_jobs           — 맞춤 채용공고 검색 (사람인 OpenAPI)
   2. analyze_job_fit       — AI 진로 적성 진단 및 직무 추천 (LLM)
   3. search_youth_policies — 청년정책·지원금 매칭 (온통청년 OpenAPI)
   4. generate_resume_tip   — 자기소개서 첨삭 + 면접 예상질문 (LLM)
+  5. build_career_action_plan — 취업 장벽을 반영한 7일 실행계획
 
 PlayMCP(https://playmcp.kakao.com) 등록용 — streamable-http 전송.
 로컬 테스트: python server.py → http://localhost:8001/mcp
@@ -44,6 +45,7 @@ from tools.search_jobs import search_jobs as _search_jobs  # noqa: E402
 from tools.analyze_job_fit import analyze_job_fit as _analyze_job_fit  # noqa: E402
 from tools.search_youth_policies import search_youth_policies as _search_youth_policies  # noqa: E402
 from tools.generate_resume_tip import generate_resume_tip as _generate_resume_tip  # noqa: E402
+from tools.build_career_action_plan import build_career_action_plan as _build_career_action_plan  # noqa: E402
 from tools.common import (  # noqa: E402
     is_mock_mode,
     live_api_enabled,
@@ -80,12 +82,14 @@ mcp = FastMCP(
     "CareerTalk",
     instructions=(
         "CareerTalk은 청년 진로·취업을 돕는 AI 멘토 MCP 서버입니다. "
-        "4개 도구를 제공합니다:\n"
+        "5개 도구를 제공합니다:\n"
         "1. search_jobs — 맞춤 채용공고 검색 (사람인 OpenAPI)\n"
         "2. analyze_job_fit — AI 진로 적성 진단 및 직무 추천\n"
         "3. search_youth_policies — 청년정책·지원금 매칭 (온통청년)\n"
-        "4. generate_resume_tip — 자기소개서 첨삭 + 면접 예상질문 생성\n\n"
-        "모든 응답은 한국어로 제공됩니다."
+        "4. generate_resume_tip — 자기소개서 첨삭 + 면접 예상질문 생성\n"
+        "5. build_career_action_plan — 시간·비용·경험·불안 장벽을 반영한 7일 실행계획\n\n"
+        "사용자가 막막함이나 실행 방법을 물으면 build_career_action_plan을 우선 고려하고, "
+        "실제 공고·정책·첨삭이 필요할 때 나머지 도구로 이어가세요. 모든 응답은 한국어로 제공합니다."
     ),
     stateless_http=True,
     json_response=True,
@@ -108,35 +112,43 @@ def _read_only_annotations(title: str) -> ToolAnnotations:
 mcp.tool(
     title="Search Jobs | 채용공고 검색",
     description=(
-        "Searches live or clearly labeled demo job listings for CareerTalk(진로톡) "
-        "using job keywords, location, role, and education filters."
+        "사용자가 채용공고·일자리·신입 포지션을 찾을 때 호출합니다. Searches live or clearly "
+        "labeled demo job listings for CareerTalk(진로톡) using keyword, region, role, and education filters."
     ),
     annotations=_read_only_annotations("Search Jobs | 채용공고 검색"),
 )(_search_jobs)
 mcp.tool(
     title="Analyze Career Fit | 직무 적합도 분석",
     description=(
-        "Analyzes a user profile and recommends five career paths for CareerTalk(진로톡); "
-        "uses a protected LLM call or a deterministic fallback."
+        "사용자가 자신에게 맞는 직무나 진입 경로를 물을 때 호출합니다. Analyzes a user profile and "
+        "recommends five career paths for CareerTalk(진로톡) using a protected LLM or deterministic fallback."
     ),
     annotations=_read_only_annotations("Analyze Career Fit | 직무 적합도 분석"),
 )(_analyze_job_fit)
 mcp.tool(
     title="Search Youth Policies | 청년정책 검색",
     description=(
-        "Searches live or clearly labeled demo youth support policies for CareerTalk(진로톡) "
-        "by age, region, and employment situation."
+        "사용자가 받을 수 있는 취업·교육·주거 지원을 물을 때 호출합니다. Searches live or clearly "
+        "labeled demo youth policies for CareerTalk(진로톡) by age, region, and employment situation."
     ),
     annotations=_read_only_annotations("Search Youth Policies | 청년정책 검색"),
 )(_search_youth_policies)
 mcp.tool(
     title="Generate Resume Tips | 자소서 첨삭",
     description=(
-        "Generates resume revisions and interview preparation tips for CareerTalk(진로톡); "
-        "uses a protected LLM call or a deterministic fallback."
+        "사용자가 자기소개서 첨삭이나 면접 준비를 요청할 때 호출합니다. Generates resume revisions and "
+        "interview preparation for CareerTalk(진로톡) using a protected LLM or deterministic fallback."
     ),
     annotations=_read_only_annotations("Generate Resume Tips | 자소서 첨삭"),
 )(_generate_resume_tip)
+mcp.tool(
+    title="Build a 7-Day Career Plan | 7일 커리어 실행계획",
+    description=(
+        "사용자가 취업이 막막하거나 시간·비용·경험 부족 때문에 시작하지 못할 때 우선 호출합니다. "
+        "Builds a private, barrier-aware seven-day micro-action plan for CareerTalk(진로톡) without an external API."
+    ),
+    annotations=_read_only_annotations("Build a 7-Day Career Plan | 7일 커리어 실행계획"),
+)(_build_career_action_plan)
 
 
 # ──────────────────────────────────────────────
@@ -149,7 +161,7 @@ def server_status() -> str:
 
     status = {
         "server": "CareerTalk MCP",
-        "tools": ["search_jobs", "analyze_job_fit", "search_youth_policies", "generate_resume_tip"],
+        "tools": ["search_jobs", "analyze_job_fit", "search_youth_policies", "generate_resume_tip", "build_career_action_plan"],
         "mode": _runtime_mode(),
         "live_api_enabled": live_api_enabled(),
         "api_keys": {
@@ -179,7 +191,7 @@ async def root_status(_request: Request) -> JSONResponse:
     import json
 
     payload = json.loads(server_status())
-    payload.update({"status": "ok", "version": "2.2.0", "endpoint": "/mcp"})
+    payload.update({"status": "ok", "version": "3.0.0", "endpoint": "/mcp"})
     return JSONResponse(payload)
 
 
@@ -242,7 +254,7 @@ if __name__ == "__main__":
     print(f"  Transport: {transport}")
     print(f"  Endpoint:   http://{host}:{port}/mcp")
     print(f"  Mode:       {mode_label}")
-    print(f"  Tools:      search_jobs, analyze_job_fit, search_youth_policies, generate_resume_tip")
+    print(f"  Tools:      search_jobs, analyze_job_fit, search_youth_policies, generate_resume_tip, build_career_action_plan")
     print()
     print("  API key status:")
     print(f"    saramin:      {'configured' if get_saramin_key() else 'missing (Mock)'}")

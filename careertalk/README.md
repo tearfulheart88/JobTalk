@@ -35,7 +35,7 @@
 
 ```
 careertalk/
-├── server.py              # FastMCP 메인 서버 (4개 Tool 등록)
+├── server.py              # FastMCP 메인 서버 (5개 Tool 등록)
 ├── requirements.txt       # 의존성 목록
 ├── .env.example           # API 키 설정 템플릿
 ├── README.md              # 이 파일
@@ -136,8 +136,8 @@ python -m pip install -r requirements-dev.txt
 python -m pytest -q
 ```
 
-pytest 19개와 직접 통합 검증 35개를 실행합니다:
-- server.py 임포트 + 4개 Tool 등록 확인
+pytest 20개와 직접 통합 검증 39개를 실행합니다:
+- server.py 임포트 + 5개 Tool 등록 확인
 - search_jobs: 기본 검색, 키워드 필터, count 제한
 - analyze_job_fit: IT/비IT 진로 분석
 - search_youth_policies: 정책 검색, 지역 필터, display 제한

@@ -1,16 +1,16 @@
 # 진로톡 개발 현황
 
-최종 점검: 2026-07-13
+최종 점검: 2026-07-14
 
 ## 현재 상태
 
 - 공식 `FastMCP` 기반 stateless Streamable HTTP 서버
 - endpoint `/mcp`, health endpoint `/health`
-- Tool 4개 등록
-- pytest 19개 및 통합·회귀 검증 35개 통과
+- Tool 5개 등록
+- pytest 20개 및 통합·회귀 검증 39개 통과
 - 공식 MCP Python 클라이언트로 initialize, tools/list, tools/call 통과
 - 실제 Streamable HTTP Mock 호출 5.8ms(로컬 1회 측정, 환경에 따라 변동)
-- 4개 Tool의 PlayMCP annotations 5개와 영문 설명 검증 통과
+- 5개 Tool의 PlayMCP annotations 5개와 한·영 설명 검증 통과
 - PlayMCP in KC용 Dockerfile 준비
 
 ## 이번 최종 점검 반영
@@ -29,6 +29,8 @@
 12. SQLite 일일 쿼터, 분당·동시 호출 제한, 최대 2.5초 타임아웃을 추가했습니다.
 13. API 인증 쿼리와 환경변수 키가 오류 응답·로그에 노출되지 않도록 마스킹했습니다.
 14. Tool별 `title`, 영문 `description`, annotations 5개를 모두 명시했습니다.
+15. 시간·비용·경험·불안 장벽을 오늘 행동과 7일 계획으로 바꾸는 `build_career_action_plan`을 추가했습니다.
+16. 대표 실행계획은 외부 API 없이 동작하고 이름·연락처 등 개인정보를 요구하지 않도록 설계했습니다.
 
 ## 검증 명령
 

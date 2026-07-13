@@ -1,7 +1,7 @@
 """
 CareerTalk MCP 서버 통합 테스트
 ================================
-4개 도구의 임포트, 호출, Mock 응답 검증.
+5개 도구의 임포트, 호출, Mock 응답 검증.
 
 실행: python tests/test_servers.py
 """
@@ -198,6 +198,36 @@ async def test_generate_resume_tip():
 
 
 @pytest.mark.anyio
+async def test_build_career_action_plan():
+    """Tool 5: barrier-aware seven-day action plan."""
+    print("\n[Tool 5] build_career_action_plan")
+    from tools.build_career_action_plan import build_career_action_plan
+
+    result = await build_career_action_plan(
+        goal="백엔드 개발자 취업",
+        current_skills="Python 기초, 팀 프로젝트 1회",
+        barrier="알바와 병행해서 시간이 부족하고 신입이라 경력이 없어 막막해요",
+        available_minutes_per_day=20,
+    )
+    assert result["source"] == "deterministic_plan"
+    assert len(result["missions"]) == 7
+    assert result["today_mission"]["minutes"] == 20
+    assert result["barrier_support"]["label"] == "시간 부족 · 경험 부족"
+    assert result["barrier_support"]["detected"] == ["시간 부족", "경험 부족", "시작 장벽"]
+    assert len(result["kakao_cards"]) == 2
+    _ok("장벽 맞춤 7일 계획 생성")
+    _ok("하루 시간 제한과 완료 기준 반영")
+    _ok("오늘 미션 + 전체 로드맵 카드 생성")
+
+    invalid = await build_career_action_plan(
+        goal="개발자 취업",
+        available_minutes_per_day=5,
+    )
+    assert "error" in invalid
+    _ok("비현실적 시간 입력 차단")
+
+
+@pytest.mark.anyio
 async def test_server_import():
     """server.py 임포트 및 FastMCP 도구 등록 검증."""
     print("\n[Server] server.py 임포트")
@@ -222,13 +252,13 @@ async def test_server_import():
         try:
             tools = await mod.mcp.list_tools()
             tool_names = [t.name for t in tools]
-            expected = {"search_jobs", "analyze_job_fit", "search_youth_policies", "generate_resume_tip"}
+            expected = {"search_jobs", "analyze_job_fit", "search_youth_policies", "generate_resume_tip", "build_career_action_plan"}
             found = set(tool_names)
             missing = expected - found
             if missing:
                 _fail("도구 등록", f"누락: {missing}")
             else:
-                _ok(f"4개 Tool 등록 확인: {', '.join(sorted(found))}")
+                _ok(f"5개 Tool 등록 확인: {', '.join(sorted(found))}")
             for tool in tools:
                 annotations = tool.annotations
                 assert annotations is not None, f"{tool.name}: annotations 누락"
@@ -245,10 +275,10 @@ async def test_server_import():
                 tm = getattr(mod.mcp, "_tool_manager", None)
                 if tm and hasattr(tm, "_tools"):
                     tool_names = list(tm._tools.keys())
-                    expected = {"search_jobs", "analyze_job_fit", "search_youth_policies", "generate_resume_tip"}
+                    expected = {"search_jobs", "analyze_job_fit", "search_youth_policies", "generate_resume_tip", "build_career_action_plan"}
                     found = set(tool_names) & expected
-                    if len(found) == 4:
-                        _ok(f"4개 Tool 등록 확인 (내부 API): {', '.join(sorted(found))}")
+                    if len(found) == 5:
+                        _ok(f"5개 Tool 등록 확인 (내부 API): {', '.join(sorted(found))}")
                     else:
                         _fail("도구 등록", f"등록된 도구: {tool_names}")
                 else:
@@ -755,6 +785,7 @@ async def main():
     await test_analyze_job_fit()
     await test_search_youth_policies()
     await test_generate_resume_tip()
+    await test_build_career_action_plan()
     await test_kakao_cards()
     test_response_cache()
     test_response_cache_eviction()

@@ -3,16 +3,26 @@
 청년의 진로 탐색, 채용공고·청년정책 검색, 자기소개서 코칭을 제공하는 한국어 MCP 서버입니다.
 AGENTIC PLAYER 10 출품을 위한 검증 가능한 프로토타입입니다.
 
+> **정보를 더 주는 서비스가 아니라, 막막함을 오늘의 행동으로 바꾸는 커리어 실행 도구입니다.**
+
+심사위원용 대표 질문과 구현 경계는 [SUBMISSION.md](SUBMISSION.md)에 30초 분량으로 정리했습니다.
+
+## 대표 경험
+
+`"백엔드 개발자로 취업하고 싶은데 알바 때문에 하루 20분밖에 없고 경력도 없어요"`라고 물으면
+진로톡은 오늘의 최소 행동, 완료 기준, 막혔을 때의 축소 행동과 7일 실행계획을 먼저 제시합니다.
+이후 채용공고·청년정책·직무분석·자소서 첨삭으로 자연스럽게 이어집니다.
+
 ## 구현 상태
 
 - 공식 MCP Python SDK `FastMCP`
 - stateless Streamable HTTP + JSON response
 - MCP endpoint: `/mcp`
 - health endpoint: `/health`
-- pytest 19개, 통합·회귀 검증 35개 통과
+- pytest 20개, 통합·회귀 검증 39개 통과
 - 공식 MCP 클라이언트 initialize, tools/list, tools/call 통과
 - 외부 API 키가 없을 때 명확히 표시된 데모 데이터 제공
-- PlayMCP 필수 Tool annotations 5개를 4개 Tool에 모두 명시
+- PlayMCP 필수 Tool annotations 5개를 5개 Tool에 모두 명시
 - SQLite 일일 한도, 분당·동시 호출 제한, 2.5초 타임아웃 상한 적용
 
 ## MCP Tools
@@ -23,6 +33,7 @@ AGENTIC PLAYER 10 출품을 위한 검증 가능한 프로토타입입니다.
 | `analyze_job_fit` | 관심·학력·성향 기반 직무 TOP 5와 진입 경로 | OpenAI |
 | `search_youth_policies` | 나이·지역·상황 기반 청년정책 검색 | 온통청년 OpenAPI |
 | `generate_resume_tip` | 자기소개서 첨삭과 예상 면접질문 | OpenAI |
+| `build_career_action_plan` | 시간·비용·경험·불안 장벽을 반영한 7일 실행계획 | 외부 API 없음 |
 
 모든 Tool은 원본 결과와 함께 카카오 카드로 변환하기 쉬운 `kakao_cards`를 반환합니다.
 
