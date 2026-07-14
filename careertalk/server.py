@@ -3,12 +3,13 @@ CareerTalk MCP Server
 =====================
 청년 진로·취업 AI 멘토 — MCP(Model Context Protocol) 서버
 
-5개 Tool 제공:
-  1. search_jobs           — 맞춤 채용공고 검색 (사람인 OpenAPI)
-  2. analyze_job_fit       — AI 진로 적성 진단 및 직무 추천 (LLM)
-  3. search_youth_policies — 청년정책·지원금 매칭 (온통청년 OpenAPI)
-  4. generate_resume_tip   — 자기소개서 첨삭 + 면접 예상질문 (LLM)
-  5. build_career_action_plan — 취업 장벽을 반영한 7일 실행계획
+6개 Tool 제공:
+  1. career_guide          — 첫 사용 안내·예시·FAQ·개인정보 원칙
+  2. search_jobs           — 맞춤 채용공고 검색 (사람인 OpenAPI)
+  3. analyze_job_fit       — AI 진로 적성 진단 및 직무 추천 (LLM)
+  4. search_youth_policies — 청년정책·지원금 매칭 (온통청년 OpenAPI)
+  5. generate_resume_tip   — 자기소개서 첨삭 + 면접 예상질문 (LLM)
+  6. build_career_action_plan — 취업 장벽을 반영한 7일 실행계획
 
 PlayMCP(https://playmcp.kakao.com) 등록용 — streamable-http 전송.
 로컬 테스트: python server.py → http://localhost:8001/mcp
@@ -46,6 +47,7 @@ from tools.analyze_job_fit import analyze_job_fit as _analyze_job_fit  # noqa: E
 from tools.search_youth_policies import search_youth_policies as _search_youth_policies  # noqa: E402
 from tools.generate_resume_tip import generate_resume_tip as _generate_resume_tip  # noqa: E402
 from tools.build_career_action_plan import build_career_action_plan as _build_career_action_plan  # noqa: E402
+from tools.career_guide import career_guide as _career_guide  # noqa: E402
 from tools.common import (  # noqa: E402
     is_mock_mode,
     live_api_enabled,
@@ -82,12 +84,14 @@ mcp = FastMCP(
     "CareerTalk",
     instructions=(
         "CareerTalk은 청년 진로·취업을 돕는 AI 멘토 MCP 서버입니다. "
-        "5개 도구를 제공합니다:\n"
-        "1. search_jobs — 맞춤 채용공고 검색 (사람인 OpenAPI)\n"
-        "2. analyze_job_fit — AI 진로 적성 진단 및 직무 추천\n"
-        "3. search_youth_policies — 청년정책·지원금 매칭 (온통청년)\n"
-        "4. generate_resume_tip — 자기소개서 첨삭 + 면접 예상질문 생성\n"
-        "5. build_career_action_plan — 시간·비용·경험·불안 장벽을 반영한 7일 실행계획\n\n"
+        "6개 도구를 제공합니다:\n"
+        "1. career_guide — 첫 사용 안내·사용 예시·FAQ·개인정보 원칙\n"
+        "2. search_jobs — 맞춤 채용공고 검색 (사람인 OpenAPI)\n"
+        "3. analyze_job_fit — AI 진로 적성 진단 및 직무 추천\n"
+        "4. search_youth_policies — 청년정책·지원금 매칭 (온통청년)\n"
+        "5. generate_resume_tip — 자기소개서 첨삭 + 면접 예상질문 생성\n"
+        "6. build_career_action_plan — 시간·비용·경험·불안 장벽을 반영한 7일 실행계획\n\n"
+        "처음 방문했거나 사용법·도움말·FAQ를 물으면 career_guide를 먼저 호출하세요. "
         "사용자가 막막함이나 실행 방법을 물으면 build_career_action_plan을 우선 고려하고, "
         "실제 공고·정책·첨삭이 필요할 때 나머지 도구로 이어가세요. 모든 응답은 한국어로 제공합니다."
     ),
@@ -108,6 +112,15 @@ def _read_only_annotations(title: str) -> ToolAnnotations:
         idempotentHint=True,
         openWorldHint=True,
     )
+
+mcp.tool(
+    title="Start CareerTalk | 진로톡 시작 안내",
+    description=(
+        "사용자가 처음 방문했거나 목적·사용법·예시·FAQ·개인정보 처리를 물을 때 먼저 호출합니다. "
+        "Explains how to start and safely use CareerTalk(진로톡) with one-tap examples and built-in FAQs."
+    ),
+    annotations=_read_only_annotations("Start CareerTalk | 진로톡 시작 안내"),
+)(_career_guide)
 
 mcp.tool(
     title="Search Jobs | 채용공고 검색",
@@ -161,7 +174,7 @@ def server_status() -> str:
 
     status = {
         "server": "CareerTalk MCP",
-        "tools": ["search_jobs", "analyze_job_fit", "search_youth_policies", "generate_resume_tip", "build_career_action_plan"],
+        "tools": ["career_guide", "search_jobs", "analyze_job_fit", "search_youth_policies", "generate_resume_tip", "build_career_action_plan"],
         "mode": _runtime_mode(),
         "live_api_enabled": live_api_enabled(),
         "api_keys": {
@@ -254,7 +267,7 @@ if __name__ == "__main__":
     print(f"  Transport: {transport}")
     print(f"  Endpoint:   http://{host}:{port}/mcp")
     print(f"  Mode:       {mode_label}")
-    print(f"  Tools:      search_jobs, analyze_job_fit, search_youth_policies, generate_resume_tip, build_career_action_plan")
+    print("  Tools:      career_guide, search_jobs, analyze_job_fit, search_youth_policies, generate_resume_tip, build_career_action_plan")
     print()
     print("  API key status:")
     print(f"    saramin:      {'configured' if get_saramin_key() else 'missing (Mock)'}")

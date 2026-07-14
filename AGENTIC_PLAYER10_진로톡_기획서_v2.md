@@ -115,17 +115,18 @@
 | US-04 | **"나 20대 후반인데 받을 수 있는 청년수당·지원금 뭐 있어?"** | 프리랜서 최유진(28) | 청년정책·수당·교육 프로그램 매칭 |
 | US-05 | **"비슷한 길 걸은 선배 멘토 연결해줘. 현실적인 조언 듣고 싶어"** | 진로 고민 중 이현우(19) | 멘토 매칭 + 익명 Q&A |
 
-### 2.2 MCP Tool — MVP 5종
+### 2.2 MCP Tool — 구현 완료 6종
 
 | # | Tool 이름 | 설명 | 입력 | 출력 | 데이터 소스 |
 |---|----------|------|------|------|------------|
+| T-00 | `career_guide` | 첫 사용 목적·예시·FAQ·개인정보 안내 | 안내 action, 질문 | 안내 카드 + 시작 버튼 | 외부 API 없는 내장 가이드 |
 | T-01 | `search_jobs` | 맞춤 채용공고 검색 | 직무, 지역, 경력, 키워드 | 공고 리스트 (회사·직무·마감일·링크) | 사람인 OpenAPI (JSON, 500회/일) |
 | T-02 | `analyze_job_fit` | AI 진로 적성 진단 및 직무 추천 | 관심분야, 학력, 성향 키워드 | 추천 직무 TOP5 + 진입 경로 | Claude/GPT API (Prompt Caching + Streaming) |
 | T-03 | `search_youth_policies` | 청년정책·지원금 매칭 | 나이, 지역, 상황(재학/졸업/미취업) | 매칭 정책 리스트 + 신청 링크 | 온통청년 OpenAPI (실시간, 무료, JSON) |
 | T-04 | `generate_resume_tip` | 자기소개서 첨삭 + 면접 코칭 | 자소서 텍스트, 지원 직무 | 첨삭본 + 예상 면접질문 5선 | Claude/GPT API (경량 모델) |
 | T-05 | `build_career_action_plan` | 취업 장벽을 오늘 행동과 7일 계획으로 전환 | 목표, 현재 역량, 장벽, 하루 가능 시간 | 오늘 미션 + 완료 기준 + 7일 로드맵 | 외부 API 없는 결정적 계획 엔진 |
 
-> **MVP 범위 조정 근거**: 4주 내 5종 구현은 과도. Tool당 3~5일 소요. 고용24 API는 기업회원 전용으로 사용 불가 → 사람인+온통청년으로 대체 완료. `mentor_connect`는 시간 남을 경우에만 추가.
+> **구현 범위**: 핵심 실행·검색·분석 5종에 첫 사용 진입을 담당하는 keyless 안내 Tool을 추가했습니다. `mentor_connect`와 자동 지원은 현재 범위에 포함하지 않습니다.
 
 ### 2.3 LLM 응답 지연 해결 방안 (MVP 적용)
 
@@ -243,6 +244,7 @@
 
 ```
 FastMCP Server
+├── Tool 0: career_guide ──── Built-in onboarding and FAQ
 ├── Tool 1: search_jobs ──── 사람인 OpenAPI
 ├── Tool 2: analyze_job_fit ──── Claude/GPT API
 ├── Tool 3: search_youth_policies ──── 온통청년 API

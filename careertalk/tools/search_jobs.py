@@ -116,11 +116,153 @@ _MOCK_JOBS: list[dict[str, Any]] = [
         "url": "https://www.saramin.co.kr/jobs/view?rec_idx=mock-5",
         "keyword": "Swift,SwiftUI,iOS",
     },
+    {
+        "company_name": "부산이음복지관",
+        "title": "청년 사회복지사 신입 채용",
+        "location": "부산 > 부산진구",
+        "job_type": "정규직",
+        "industry": "사회복지",
+        "experience": "신입",
+        "education": "전문대졸 이상",
+        "salary": "2,800~3,300만원",
+        "deadline": "2026-08-02",
+        "url": "https://www.saramin.co.kr/jobs/view?rec_idx=mock-6",
+        "keyword": "사회복지,복지사,상담,사람을 돕는 일,신입",
+    },
+    {
+        "company_name": "대구늘봄케어",
+        "title": "주간보호센터 돌봄 코디네이터",
+        "location": "대구 > 수성구",
+        "job_type": "계약직→정규직",
+        "industry": "돌봄 서비스",
+        "experience": "경력무관",
+        "education": "고졸 이상",
+        "salary": "월 240~280만원",
+        "deadline": "2026-08-06",
+        "url": "https://www.saramin.co.kr/jobs/view?rec_idx=mock-7",
+        "keyword": "돌봄,요양,코디네이터,고졸,경력무관",
+    },
+    {
+        "company_name": "(주)로컬웨이브",
+        "title": "지역 브랜드 디지털 마케터 신입",
+        "location": "대전 > 유성구",
+        "job_type": "정규직",
+        "industry": "광고/마케팅",
+        "experience": "신입",
+        "education": "학력무관",
+        "salary": "2,900~3,500만원",
+        "deadline": "2026-08-10",
+        "url": "https://www.saramin.co.kr/jobs/view?rec_idx=mock-8",
+        "keyword": "마케팅,SNS,콘텐츠,브랜드,신입,학력무관",
+    },
+    {
+        "company_name": "(주)바른오피스",
+        "title": "회계·경영지원 담당자 신입",
+        "location": "인천 > 연수구",
+        "job_type": "정규직",
+        "industry": "기업 서비스",
+        "experience": "신입",
+        "education": "고졸 이상",
+        "salary": "2,800~3,400만원",
+        "deadline": "2026-08-14",
+        "url": "https://www.saramin.co.kr/jobs/view?rec_idx=mock-9",
+        "keyword": "회계,사무,경영지원,엑셀,고졸,신입",
+    },
+    {
+        "company_name": "광주그린모빌리티",
+        "title": "생산 품질관리 현장 인턴",
+        "location": "광주 > 광산구",
+        "job_type": "채용연계형 인턴",
+        "industry": "제조/모빌리티",
+        "experience": "경력무관",
+        "education": "고졸 이상",
+        "salary": "월 250만원",
+        "deadline": "2026-08-18",
+        "url": "https://www.saramin.co.kr/jobs/view?rec_idx=mock-10",
+        "keyword": "생산,품질,제조,인턴,현장,고졸",
+    },
+    {
+        "company_name": "(주)모두의제품",
+        "title": "UX/UI 디자이너 주니어",
+        "location": "서울 > 중구 (주 2회 원격)",
+        "job_type": "정규직",
+        "industry": "디지털 제품",
+        "experience": "신입~2년",
+        "education": "학력무관",
+        "salary": "3,100~4,000만원",
+        "deadline": "2026-08-22",
+        "url": "https://www.saramin.co.kr/jobs/view?rec_idx=mock-11",
+        "keyword": "UX,UI,Figma,디자인,포트폴리오,원격",
+    },
+    {
+        "company_name": "부산데이터협동조합",
+        "title": "공공데이터 분석가 신입",
+        "location": "부산 > 해운대구",
+        "job_type": "정규직",
+        "industry": "데이터/공공",
+        "experience": "신입",
+        "education": "전문대졸 이상",
+        "salary": "3,000~3,800만원",
+        "deadline": "2026-08-26",
+        "url": "https://www.saramin.co.kr/jobs/view?rec_idx=mock-12",
+        "keyword": "데이터,Python,SQL,통계,공공데이터,신입",
+    },
+    {
+        "company_name": "전북청년마음센터",
+        "title": "청년 상담·프로그램 운영 매니저",
+        "location": "전북 > 전주시",
+        "job_type": "계약직",
+        "industry": "청년지원/상담",
+        "experience": "경력무관",
+        "education": "대학교졸업(4년)이상",
+        "salary": "월 260~300만원",
+        "deadline": "2026-08-30",
+        "url": "https://www.saramin.co.kr/jobs/view?rec_idx=mock-13",
+        "keyword": "청년,상담,프로그램,복지,운영,사람을 돕는 일",
+    },
+    {
+        "company_name": "울산스마트로지스",
+        "title": "물류 운영·재고관리 신입",
+        "location": "울산 > 남구",
+        "job_type": "정규직",
+        "industry": "물류/유통",
+        "experience": "신입",
+        "education": "고졸 이상",
+        "salary": "3,000~3,600만원",
+        "deadline": "2026-09-03",
+        "url": "https://www.saramin.co.kr/jobs/view?rec_idx=mock-14",
+        "keyword": "물류,유통,재고,운영,엑셀,신입,고졸",
+    },
+    {
+        "company_name": "(주)페이지온",
+        "title": "원격 콘텐츠 에디터·운영 인턴",
+        "location": "전국 > 원격근무",
+        "job_type": "채용연계형 인턴",
+        "industry": "콘텐츠/교육",
+        "experience": "경력무관",
+        "education": "학력무관",
+        "salary": "월 230만원",
+        "deadline": "2026-09-07",
+        "url": "https://www.saramin.co.kr/jobs/view?rec_idx=mock-15",
+        "keyword": "글쓰기,콘텐츠,에디터,운영,인턴,원격,학력무관",
+    },
 ]
 
 
-def _mock_search(keywords: str, count: int) -> dict[str, Any]:
-    """Mock 모드 — 키워드가 비어있으면 전체, 있으면 토큰 단위 매칭(매칭 수 내림차순)."""
+def _text_filter(value: str) -> str:
+    """Mock 데이터에서 의미 있게 비교할 수 있는 한글/영문 필터만 반환."""
+    value = str(value or "").strip().lower()
+    return value if any(ch.isalpha() for ch in value) else ""
+
+
+def _mock_search(
+    keywords: str,
+    loc_cd: str,
+    job_mid_cd: str,
+    edu_lv: str,
+    count: int,
+) -> dict[str, Any]:
+    """Mock 모드 — 다양한 직군을 토큰 점수로 검색하고 0건이면 조건 확장 결과를 제안."""
     today = _dt.datetime.now(_KST).date()
     demo_jobs: list[dict[str, Any]] = []
     for index, source in enumerate(_MOCK_JOBS):
@@ -134,19 +276,47 @@ def _mock_search(keywords: str, count: int) -> dict[str, Any]:
         job["is_demo"] = True
         demo_jobs.append(job)
 
+    location_filter = _text_filter(loc_cd)
+    role_filter = _text_filter(job_mid_cd)
+    education_filter = _text_filter(edu_lv)
+    candidates = [
+        job for job in demo_jobs
+        if (not location_filter or location_filter in job["location"].lower())
+        and (not role_filter or role_filter in f"{job['title']} {job['industry']} {job['keyword']}".lower())
+        and (not education_filter or education_filter in job["education"].lower())
+    ]
+
     if keywords:
         # "프론트엔드 React" 같은 다단어 검색도 동작하도록 토큰별로 매칭
         tokens = [t for t in keywords.lower().replace(",", " ").split() if t]
         scored: list[tuple[int, dict[str, Any]]] = []
-        for j in demo_jobs:
-            haystack = f"{j['title']} {j['keyword']} {j['company_name']}".lower()
+        for j in candidates:
+            haystack = (
+                f"{j['title']} {j['keyword']} {j['company_name']} "
+                f"{j['location']} {j['industry']} {j['experience']} {j['education']}"
+            ).lower()
             matches = sum(1 for t in tokens if t in haystack)
             if matches:
                 scored.append((matches, j))
         scored.sort(key=lambda pair: pair[0], reverse=True)
         filtered = [j for _, j in scored]
     else:
-        filtered = demo_jobs
+        filtered = candidates
+
+    exact_match_count = len(filtered)
+    relaxed_filters: list[str] = []
+    if not filtered:
+        # 심사 데모에서 막다른 화면 대신, 조건을 넓힌 참고 결과를 정직하게 표시한다.
+        location_only = [
+            job for job in demo_jobs
+            if not location_filter or location_filter in job["location"].lower()
+        ]
+        filtered = (location_only or demo_jobs)[: max(3, count)]
+        relaxed_filters.append("키워드·직무·학력 조건")
+        if location_filter and not location_only:
+            relaxed_filters.append("지역 조건")
+        for job in filtered:
+            job["match_note"] = "정확히 일치하는 데모 공고가 없어 조건을 넓힌 참고 결과입니다."
 
     jobs = filtered[:count]
     return {
@@ -155,9 +325,22 @@ def _mock_search(keywords: str, count: int) -> dict[str, Any]:
         "start": 0,
         "source": "mock",
         "demo_data": True,
+        "exact_match_count": exact_match_count,
+        "relaxed_filters": relaxed_filters,
+        "filters": {
+            "keywords": keywords,
+            "location": loc_cd,
+            "role": job_mid_cd,
+            "education": edu_lv,
+        },
         "jobs": jobs,
         "kakao_cards": job_cards(jobs),
-        "message": f"[Mock 모드] 채용공고 {len(jobs)}건 검색 (실제 API 키 설정 시 실제 데이터 반환)",
+        "quick_replies": ["신입 공고만", "지역 조건 넓혀줘", "맞는 직무 찾아줘", "7일 계획 만들기"],
+        "message": (
+            f"[Mock 모드] 정확히 맞는 데모 공고 {exact_match_count}건"
+            if exact_match_count
+            else f"[Mock 모드] 정확한 결과가 없어 조건을 넓힌 참고 공고 {len(jobs)}건"
+        ) + " (API 연결 시 실시간 데이터 반환)",
     }
 
 
@@ -311,7 +494,7 @@ async def search_jobs(
 
     # ── Mock 모드 ──
     if is_mock_mode() or not live_api_enabled() or not get_saramin_key():
-        return _mock_search(keywords, count)
+        return _mock_search(keywords, loc_cd, job_mid_cd, edu_lv, count)
 
     # ── 레이트리밋 (사람인 일일 500회 한도 보호 — 캐시 히트는 위에서 반환됨) ──
     limited = rate_limit_exceeded("external")

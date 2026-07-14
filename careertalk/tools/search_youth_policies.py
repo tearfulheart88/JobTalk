@@ -78,6 +78,9 @@ _MOCK_POLICIES: list[dict[str, Any]] = [
         "application_url": "https://www.youthcenter.go.kr/plcy/001",
         "agency": "고용노동부",
         "description": "구직활동을 하는 미취업 청년에게 취업준비 비용을 지원합니다.",
+        "_min_age": 18,
+        "_max_age": 34,
+        "_situations": ["미취업", "구직", "졸업", "취업준비"],
     },
     {
         "policy_id": "plcy-002",
@@ -92,6 +95,9 @@ _MOCK_POLICIES: list[dict[str, Any]] = [
         "application_url": "https://www.youthcenter.go.kr/plcy/002",
         "agency": "고용노동부",
         "description": "청년의 중소기업 취업을 유도하기 위해 소득을 지원합니다.",
+        "_min_age": 18,
+        "_max_age": 39,
+        "_situations": ["미취업", "구직단념", "쉬었음", "장기미취업", "구직"],
     },
     {
         "policy_id": "plcy-003",
@@ -106,6 +112,9 @@ _MOCK_POLICIES: list[dict[str, Any]] = [
         "application_url": "https://www.youthcenter.go.kr/plcy/003",
         "agency": "서울특별시",
         "description": "서울시 거주 미취업 청년의 생활안정과 구직활동을 지원합니다.",
+        "_min_age": 19,
+        "_max_age": 34,
+        "_situations": ["미취업", "구직", "졸업", "취업준비"],
     },
     {
         "policy_id": "plcy-004",
@@ -120,6 +129,9 @@ _MOCK_POLICIES: list[dict[str, Any]] = [
         "application_url": "https://www.youthcenter.go.kr/plcy/004",
         "agency": "국토교통부",
         "description": "무주택 청년의 주거안정을 위해 월세를 지원합니다.",
+        "_min_age": 19,
+        "_max_age": 34,
+        "_situations": ["주거", "독립", "자취", "재학생", "미취업", "취업"],
     },
     {
         "policy_id": "plcy-005",
@@ -134,6 +146,9 @@ _MOCK_POLICIES: list[dict[str, Any]] = [
         "application_url": "https://www.youthcenter.go.kr/plcy/005",
         "agency": "중소벤처기업부",
         "description": "청년 창업가의 초기 사업화 자금을 지원합니다.",
+        "_min_age": 20,
+        "_max_age": 39,
+        "_situations": ["창업", "예비창업", "사업", "프리랜서"],
     },
     {
         "policy_id": "plcy-006",
@@ -148,6 +163,145 @@ _MOCK_POLICIES: list[dict[str, Any]] = [
         "application_url": "https://www.youthcenter.go.kr/plcy/006",
         "agency": "과학기술정보통신부",
         "description": "AI, 빅데이터, 클라우드 등 디지털 직무 역량을 무료로 교육합니다.",
+        "_min_age": 18,
+        "_max_age": 39,
+        "_situations": ["미취업", "구직", "졸업", "재학생", "직무전환", "교육"],
+    },
+    {
+        "policy_id": "plcy-007",
+        "policy_name": "부산 청년 일경험 디딤돌",
+        "policy_number": "2026-부산-007",
+        "support_amount": "3개월 일경험 + 월 활동수당",
+        "eligibility": "부산 거주 18~34세 미취업·졸업예정 청년",
+        "category": "일경험",
+        "region": "부산",
+        "application_period": "상시 모집 회차별 확인",
+        "deadline": "2026-10-31",
+        "application_url": "https://www.youthcenter.go.kr/plcy/007",
+        "agency": "부산광역시",
+        "description": "지역 기업 프로젝트를 통해 첫 직무 경험과 멘토링을 제공하는 데모 정책입니다.",
+        "_min_age": 18,
+        "_max_age": 34,
+        "_situations": ["미취업", "졸업", "졸업예정", "경력없음", "일경험"],
+    },
+    {
+        "policy_id": "plcy-008",
+        "policy_name": "경기 청년 면접 준비 지원",
+        "policy_number": "2026-경기-008",
+        "support_amount": "면접비·정장 대여·모의면접 지원",
+        "eligibility": "경기도 거주 18~39세 구직 청년",
+        "category": "취업지원",
+        "region": "경기",
+        "application_period": "분기별 모집",
+        "deadline": "2026-11-15",
+        "application_url": "https://www.youthcenter.go.kr/plcy/008",
+        "agency": "경기도",
+        "description": "면접 비용과 준비 부담을 낮추는 통합형 데모 지원입니다.",
+        "_min_age": 18,
+        "_max_age": 39,
+        "_situations": ["미취업", "구직", "면접", "졸업", "이직"],
+    },
+    {
+        "policy_id": "plcy-009",
+        "policy_name": "재학생 직무체험 프로젝트",
+        "policy_number": "2026-교육-009",
+        "support_amount": "8주 프로젝트 + 멘토링 + 활동비",
+        "eligibility": "18~34세 대학·전문대 재학생 및 졸업예정자",
+        "category": "일경험",
+        "region": "전국",
+        "application_period": "학기별 모집",
+        "deadline": "2026-09-20",
+        "application_url": "https://www.youthcenter.go.kr/plcy/009",
+        "agency": "교육부",
+        "description": "전공과 무관하게 기업 과제를 경험하고 결과물을 포트폴리오로 남기는 데모 정책입니다.",
+        "_min_age": 18,
+        "_max_age": 34,
+        "_situations": ["재학생", "대학생", "졸업예정", "경력없음", "일경험"],
+    },
+    {
+        "policy_id": "plcy-010",
+        "policy_name": "청년 프리랜서 계약·세무 상담",
+        "policy_number": "2026-권익-010",
+        "support_amount": "계약서 검토 및 기초 세무상담 무료",
+        "eligibility": "19~39세 프리랜서·플랫폼 노동 청년",
+        "category": "권익지원",
+        "region": "전국",
+        "application_period": "상시 상담",
+        "deadline": "2026-12-31",
+        "application_url": "https://www.youthcenter.go.kr/plcy/010",
+        "agency": "청년권익지원센터",
+        "description": "불공정 계약과 대금 지연을 예방하도록 전문가 상담을 연결하는 데모 정책입니다.",
+        "_min_age": 19,
+        "_max_age": 39,
+        "_situations": ["프리랜서", "플랫폼", "계약", "세무", "부업"],
+    },
+    {
+        "policy_id": "plcy-011",
+        "policy_name": "청년 마음건강 회복 바우처",
+        "policy_number": "2026-마음-011",
+        "support_amount": "초기 상담 및 전문상담 회기 지원",
+        "eligibility": "19~34세 정서적 어려움을 겪는 청년",
+        "category": "마음건강",
+        "region": "전국",
+        "application_period": "지역별 예산 소진 시까지",
+        "deadline": "2026-12-15",
+        "application_url": "https://www.youthcenter.go.kr/plcy/011",
+        "agency": "보건복지부",
+        "description": "취업 불안, 번아웃, 고립감에 대한 전문 상담 접근성을 높이는 데모 정책입니다.",
+        "_min_age": 19,
+        "_max_age": 34,
+        "_situations": ["불안", "우울", "번아웃", "고립", "마음", "미취업"],
+    },
+    {
+        "policy_id": "plcy-012",
+        "policy_name": "가족돌봄청년 생활·진로 통합지원",
+        "policy_number": "2026-돌봄-012",
+        "support_amount": "돌봄비 상담 + 진로 멘토링 + 지역 서비스 연계",
+        "eligibility": "13~39세 가족돌봄 부담이 있는 청년",
+        "category": "생활안정",
+        "region": "전국",
+        "application_period": "상시 발굴·신청",
+        "deadline": "2026-12-31",
+        "application_url": "https://www.youthcenter.go.kr/plcy/012",
+        "agency": "보건복지부",
+        "description": "가족 돌봄 때문에 학업·취업을 미루는 청년을 지역 지원체계와 연결하는 데모 정책입니다.",
+        "_min_age": 13,
+        "_max_age": 39,
+        "_situations": ["가족돌봄", "돌봄", "재학생", "미취업", "휴학", "생활"],
+    },
+    {
+        "policy_id": "plcy-013",
+        "policy_name": "청년 금융·채무 첫 상담",
+        "policy_number": "2026-금융-013",
+        "support_amount": "재무 진단·채무조정 제도 안내 무료",
+        "eligibility": "19~39세 금융 고민이 있는 청년",
+        "category": "금융지원",
+        "region": "전국",
+        "application_period": "상시 상담",
+        "deadline": "2026-12-31",
+        "application_url": "https://www.youthcenter.go.kr/plcy/013",
+        "agency": "서민금융진흥원",
+        "description": "대출, 연체, 생활비 고민을 공공 상담기관과 연결하는 데모 정책입니다.",
+        "_min_age": 19,
+        "_max_age": 39,
+        "_situations": ["대출", "빚", "채무", "금융", "생활비", "미취업"],
+    },
+    {
+        "policy_id": "plcy-014",
+        "policy_name": "장애청년 맞춤형 취업 동행",
+        "policy_number": "2026-포용-014",
+        "support_amount": "직무평가·보조공학·면접 동행 지원",
+        "eligibility": "18~39세 장애 청년 구직자",
+        "category": "취업지원",
+        "region": "전국",
+        "application_period": "상시 접수",
+        "deadline": "2026-12-31",
+        "application_url": "https://www.youthcenter.go.kr/plcy/014",
+        "agency": "한국장애인고용공단",
+        "description": "개인의 접근성 요구를 반영해 구직 준비와 사업장 연결을 돕는 데모 정책입니다.",
+        "_min_age": 18,
+        "_max_age": 39,
+        "_situations": ["장애", "접근성", "미취업", "구직", "취업"],
     },
 ]
 
@@ -172,16 +326,35 @@ def _mock_search(
         situation=situation,
     )
 
-    policies = filtered[:display]
+    strict_count = len(filtered)
+    relaxed_filters: list[str] = []
+    if not filtered and situation:
+        filtered = _filter_policies(demo_policies, age=age, region=region, situation="")
+        relaxed_filters.append("상황 조건")
+    if not filtered and region:
+        filtered = _filter_policies(demo_policies, age=age, region="", situation="")
+        relaxed_filters.append("지역 조건")
+
+    policies = [_strip_internal_fields(dict(item)) for item in filtered[:display]]
+    if relaxed_filters:
+        for policy in policies:
+            policy["match_note"] = "정확히 일치하는 데모 정책이 없어 조건을 넓힌 참고 결과입니다."
     return {
         "total": len(policies),
         "display": len(policies),
         "pageIndex": 1,
         "source": "mock",
         "demo_data": True,
+        "exact_match_count": strict_count,
+        "relaxed_filters": relaxed_filters,
         "policies": policies,
         "kakao_cards": policy_cards(policies),
-        "message": f"[Mock 모드] 청년정책 {len(policies)}건 검색 (실제 API 키 설정 시 실시간 데이터 반환)",
+        "quick_replies": ["취업 지원만", "주거 지원만", "신청 준비물", "내 지역 넓혀 보기", "7일 계획 만들기"],
+        "message": (
+            f"[Mock 모드] 조건에 맞는 데모 정책 {strict_count}건"
+            if strict_count
+            else f"[Mock 모드] 조건을 넓힌 참고 정책 {len(policies)}건"
+        ) + " (API 연결 시 자격·마감 실시간 확인)",
     }
 
 
@@ -300,7 +473,32 @@ def _matches_age(policy: dict[str, Any], age: int | None) -> bool:
 def _strip_internal_fields(policy: dict[str, Any]) -> dict[str, Any]:
     policy.pop("_min_age", None)
     policy.pop("_max_age", None)
+    policy.pop("_situations", None)
     return policy
+
+
+_SITUATION_ALIASES: dict[str, tuple[str, ...]] = {
+    "미취업": ("미취업", "구직", "취업준비", "구직단념", "쉬었음", "장기미취업"),
+    "재학": ("재학", "재학생", "대학생", "휴학", "졸업예정"),
+    "졸업": ("졸업", "졸업예정", "취업준비", "미취업"),
+    "이직": ("이직", "직무전환", "재직", "면접"),
+    "프리랜서": ("프리랜서", "플랫폼", "부업", "계약", "세무"),
+    "창업": ("창업", "예비창업", "사업"),
+    "주거": ("주거", "월세", "자취", "독립", "무주택"),
+    "돌봄": ("가족돌봄", "돌봄", "생활"),
+}
+
+
+def _situation_terms(situation: str) -> set[str]:
+    query = str(situation or "").lower().replace(" ", "")
+    if not query:
+        return set()
+    terms = {query}
+    for category, aliases in _SITUATION_ALIASES.items():
+        normalized_aliases = {alias.lower().replace(" ", "") for alias in aliases}
+        if category in query or any(alias in query for alias in normalized_aliases):
+            terms.update(normalized_aliases)
+    return terms
 
 
 def _filter_policies(
@@ -322,9 +520,9 @@ def _filter_policies(
         if situation:
             haystack = " ".join(
                 str(policy.get(k) or "")
-                for k in ("policy_name", "category", "eligibility", "description", "support_amount")
-            )
-            if situation not in haystack:
+                for k in ("policy_name", "category", "eligibility", "description", "support_amount", "_situations")
+            ).lower().replace(" ", "")
+            if not any(term in haystack for term in _situation_terms(situation)):
                 continue
         filtered.append(policy)
     return filtered

@@ -1,7 +1,7 @@
 """
 CareerTalk MCP 서버 통합 테스트
 ================================
-5개 도구의 임포트, 호출, Mock 응답 검증.
+6개 도구의 임포트, 호출, Mock 응답 검증.
 
 실행: python tests/test_servers.py
 """
@@ -228,6 +228,28 @@ async def test_build_career_action_plan():
 
 
 @pytest.mark.anyio
+async def test_career_guide():
+    """첫 실행 안내, 사용 예시, FAQ를 API 없이 제공한다."""
+    print("\n[Guide] career_guide")
+    from tools.career_guide import career_guide
+
+    start = await career_guide(action="start")
+    assert start["source"] == "built_in_guide"
+    assert start["mock_mode_independent"] is True
+    assert len(start["kakao_cards"]) >= 2
+    assert "7일 계획 시작" in start["quick_replies"]
+
+    examples = await career_guide(action="examples")
+    assert len(examples["kakao_cards"]) >= 5
+    assert any("알바" in card["description"] for card in examples["kakao_cards"])
+
+    faq = await career_guide(action="faq", question="데모 공고가 실제인가요?")
+    assert faq["kakao_cards"]
+    assert "Mock" in faq["kakao_cards"][0]["description"]
+    _ok("첫 사용 안내 + 5개 예시 + 질문별 FAQ")
+
+
+@pytest.mark.anyio
 async def test_server_import():
     """server.py 임포트 및 FastMCP 도구 등록 검증."""
     print("\n[Server] server.py 임포트")
@@ -252,13 +274,13 @@ async def test_server_import():
         try:
             tools = await mod.mcp.list_tools()
             tool_names = [t.name for t in tools]
-            expected = {"search_jobs", "analyze_job_fit", "search_youth_policies", "generate_resume_tip", "build_career_action_plan"}
+            expected = {"career_guide", "search_jobs", "analyze_job_fit", "search_youth_policies", "generate_resume_tip", "build_career_action_plan"}
             found = set(tool_names)
             missing = expected - found
             if missing:
                 _fail("도구 등록", f"누락: {missing}")
             else:
-                _ok(f"5개 Tool 등록 확인: {', '.join(sorted(found))}")
+                _ok(f"6개 Tool 등록 확인: {', '.join(sorted(found))}")
             for tool in tools:
                 annotations = tool.annotations
                 assert annotations is not None, f"{tool.name}: annotations 누락"
@@ -268,17 +290,17 @@ async def test_server_import():
                 assert annotations.idempotentHint is True, f"{tool.name}: idempotentHint 오류"
                 assert annotations.openWorldHint is True, f"{tool.name}: openWorldHint 오류"
                 assert "CareerTalk(진로톡)" in (tool.description or ""), f"{tool.name}: 영문 설명 누락"
-            _ok("PlayMCP annotations 5개 + 서비스명 포함 영문 설명")
+            _ok("PlayMCP annotations 5개 필드 + 서비스명 포함 영문 설명")
         except Exception as e:
             # list_tools() API 가 다를 수 있음 — _tool_manager 로 폴백
             try:
                 tm = getattr(mod.mcp, "_tool_manager", None)
                 if tm and hasattr(tm, "_tools"):
                     tool_names = list(tm._tools.keys())
-                    expected = {"search_jobs", "analyze_job_fit", "search_youth_policies", "generate_resume_tip", "build_career_action_plan"}
+                    expected = {"career_guide", "search_jobs", "analyze_job_fit", "search_youth_policies", "generate_resume_tip", "build_career_action_plan"}
                     found = set(tool_names) & expected
-                    if len(found) == 5:
-                        _ok(f"5개 Tool 등록 확인 (내부 API): {', '.join(sorted(found))}")
+                    if len(found) == 6:
+                        _ok(f"6개 Tool 등록 확인 (내부 API): {', '.join(sorted(found))}")
                     else:
                         _fail("도구 등록", f"등록된 도구: {tool_names}")
                 else:
@@ -713,6 +735,31 @@ async def test_mock_keyword_tokens():
 
 
 @pytest.mark.anyio
+async def test_diverse_mock_scenarios():
+    """비IT·비수도권·청년 취약상황과 0건 완화 흐름을 검증한다."""
+    print("\n[Mock] 다양한 사용자 상황")
+    from tools.analyze_job_fit import analyze_job_fit
+    from tools.search_jobs import search_jobs
+    from tools.search_youth_policies import search_youth_policies
+
+    welfare = await analyze_job_fit(interests="사회복지와 사람을 돕는 일", tendencies="경청, 공감")
+    assert "청년지원" in welfare["recommended_jobs"][0]["job_title"]
+
+    local_job = await search_jobs(keywords="회계 신입", loc_cd="인천", count=5)
+    assert local_job["exact_match_count"] >= 1
+    assert any("인천" in item["location"] for item in local_job["jobs"])
+
+    freelancer = await search_youth_policies(age=28, situation="프리랜서", display=5)
+    assert freelancer["exact_match_count"] >= 1
+    assert any("프리랜서" in item["policy_name"] or "계약" in item["description"] for item in freelancer["policies"])
+
+    relaxed = await search_jobs(keywords="우주비행사", loc_cd="제주", count=3)
+    assert relaxed["exact_match_count"] == 0
+    assert relaxed["relaxed_filters"] and len(relaxed["jobs"]) > 0
+    _ok("복지 직무 + 지역 공고 + 프리랜서 정책 + 0건 조건 확장")
+
+
+@pytest.mark.anyio
 async def test_policy_pagination():
     """청년정책 다중 페이지 수집 — 필터 통과분이 display 에 찰 때까지 이어서 조회."""
     print("\n[Policies] 다중 페이지 수집")
@@ -786,6 +833,7 @@ async def main():
     await test_search_youth_policies()
     await test_generate_resume_tip()
     await test_build_career_action_plan()
+    await test_career_guide()
     await test_kakao_cards()
     test_response_cache()
     test_response_cache_eviction()
@@ -799,6 +847,7 @@ async def main():
     test_secret_redaction()
     await test_dday_kst()
     await test_mock_keyword_tokens()
+    await test_diverse_mock_scenarios()
     await test_policy_pagination()
 
     print("\n" + "=" * 60)

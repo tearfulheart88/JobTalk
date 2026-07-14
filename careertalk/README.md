@@ -4,14 +4,16 @@
 >
  카카오톡 대화로 AI가 청년의 진로·취업 고민을 해결하는 진로톡(CareerTalk) 서버입니다.
 
-## 제공 도구 (4종)
+## 제공 도구 (6종)
 
 | 도구 | 기능 | 데이터 소스 |
 |------|------|------------|
+| `career_guide` | 첫 사용 안내·사용 예시·FAQ·개인정보 원칙 | 내장 가이드 |
 | `search_jobs` | 맞춤 채용공고 검색 | 사람인 OpenAPI (`oapi.saramin.co.kr`) |
 | `analyze_job_fit` | AI 진로 적성 진단 및 직무 추천 | LLM (OpenAI GPT) |
 | `search_youth_policies` | 청년정책·지원금 매칭 | 온통청년 OpenAPI (`youthcenter.go.kr`) |
 | `generate_resume_tip` | 자기소개서 첨삭 + 면접 예상질문 생성 | LLM (OpenAI GPT) |
+| `build_career_action_plan` | 장벽을 반영한 오늘 행동과 7일 계획 | 결정론적 플래너 |
 
 > 모든 도구는 결과에 **`kakao_cards`** (카드형 위젯 렌더링 데이터)를 함께 반환합니다.
 
@@ -35,7 +37,7 @@
 
 ```
 careertalk/
-├── server.py              # FastMCP 메인 서버 (5개 Tool 등록)
+├── server.py              # FastMCP 메인 서버 (6개 Tool 등록)
 ├── requirements.txt       # 의존성 목록
 ├── .env.example           # API 키 설정 템플릿
 ├── README.md              # 이 파일
@@ -43,6 +45,8 @@ careertalk/
     ├── __init__.py        # 도구 모듈 패키지
     ├── common.py          # 공통 유틸 (환경변수, LLM+Prompt Caching, 응답 캐시, Mock 판별)
     ├── formatters.py      # Kakao 카드 포매터 (진로/공고/정책/코칭)
+    ├── career_guide.py    # 첫 실행·예시·FAQ·개인정보 안내
+    ├── build_career_action_plan.py # 장벽 기반 7일 실행계획
     ├── search_jobs.py     # Tool 1: 사람인 채용공고 검색
     ├── analyze_job_fit.py # Tool 2: LLM 진로 적성 분석
     ├── search_youth_policies.py  # Tool 3: 온통청년 공식 API + 대체 응답 파싱
@@ -124,10 +128,12 @@ API 키가 설정되지 않았거나 `MOCK_MODE=true` 또는 `LIVE_API_ENABLED=f
 
 | 도구 | Mock 동작 |
 |------|-----------|
-| `search_jobs` | 5건의 샘플 IT 공고 반환, 키워드 필터링 지원 |
-| `analyze_job_fit` | IT/비IT 관심분야별 5개 추천 직무 반환 |
-| `search_youth_policies` | 6건의 샘플 청년정책 반환, 지역 필터링 지원 |
+| `career_guide` | 목적·다섯 가지 시작 예시·질문별 FAQ를 버튼과 카드로 반환 |
+| `search_jobs` | 15개 직군·지역 샘플에서 토큰 검색, 0건 시 조건 확장 표시 |
+| `analyze_job_fit` | IT·복지·디자인·운영 등 관심분야별 5개 추천 직무 반환 |
+| `search_youth_policies` | 14개 상황별 샘플에서 나이·지역·상황 필터링 |
 | `generate_resume_tip` | 원문을 간단히 다듬은 첨삭본 + 5개 예상질문 반환 |
+| `build_career_action_plan` | 외부 API 없이 오늘 행동·축소 행동·7일 미션 반환 |
 
 ## 테스트
 
@@ -136,8 +142,8 @@ python -m pip install -r requirements-dev.txt
 python -m pytest -q
 ```
 
-pytest 20개와 직접 통합 검증 39개를 실행합니다:
-- server.py 임포트 + 5개 Tool 등록 확인
+pytest 22개와 직접 통합 검증 41개를 실행합니다:
+- server.py 임포트 + 6개 Tool 등록 확인
 - search_jobs: 기본 검색, 키워드 필터, count 제한
 - analyze_job_fit: IT/비IT 진로 분석
 - search_youth_policies: 정책 검색, 지역 필터, display 제한

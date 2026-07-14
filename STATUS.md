@@ -6,11 +6,11 @@
 
 - 공식 `FastMCP` 기반 stateless Streamable HTTP 서버
 - endpoint `/mcp`, health endpoint `/health`
-- Tool 5개 등록
-- pytest 20개 및 통합·회귀 검증 39개 통과
+- Tool 6개 등록
+- pytest 22개 및 통합·회귀 검증 41개 통과
 - 공식 MCP Python 클라이언트로 initialize, tools/list, tools/call 통과
 - 실제 Streamable HTTP Mock 호출 5.8ms(로컬 1회 측정, 환경에 따라 변동)
-- 5개 Tool의 PlayMCP annotations 5개와 한·영 설명 검증 통과
+- 6개 Tool의 PlayMCP annotations 5개와 한·영 설명 검증 통과
 - PlayMCP in KC용 Dockerfile 준비
 
 ## 이번 최종 점검 반영
@@ -31,6 +31,10 @@
 14. Tool별 `title`, 영문 `description`, annotations 5개를 모두 명시했습니다.
 15. 시간·비용·경험·불안 장벽을 오늘 행동과 7일 계획으로 바꾸는 `build_career_action_plan`을 추가했습니다.
 16. 대표 실행계획은 외부 API 없이 동작하고 이름·연락처 등 개인정보를 요구하지 않도록 설계했습니다.
+17. 첫 실행 목적·사용법·다섯 가지 예시·FAQ·개인정보 원칙을 제공하는 `career_guide`를 추가했습니다.
+18. Mock 채용공고를 15개로 확장해 복지·돌봄·디자인·사무·제조·물류와 비수도권·원격 사례를 포함했습니다.
+19. Mock 청년정책을 14개로 확장해 재학생·프리랜서·가족돌봄청년·마음건강·금융·장애청년 사례를 포함했습니다.
+20. 정확히 일치하는 데모가 없을 때 0건으로 끝내지 않고, 완화한 조건과 참고 결과임을 명시해 다음 행동으로 연결합니다.
 
 ## 검증 명령
 
