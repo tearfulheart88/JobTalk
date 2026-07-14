@@ -267,6 +267,12 @@ async def test_server_import():
         assert mod.mcp.settings.stateless_http is True, "클라우드용 stateless_http 미설정"
         assert mod.mcp.settings.json_response is True, "JSON response 미설정"
         assert mod.mcp.settings.streamable_http_path == "/mcp", "MCP 경로 불일치"
+        security = mod.mcp.settings.transport_security
+        assert security is not None, "MCP transport security 미설정"
+        assert security.enable_dns_rebinding_protection is True, "DNS rebinding 보호 비활성"
+        assert (
+            "jobtalk-mcp.playmcp-endpoint.kakaocloud.io" in security.allowed_hosts
+        ), "PlayMCP 공개 Host 미허용"
         _ok("FastMCP 인스턴스 생성")
 
         # 도구 등록 확인 — FastMCP 의 tool manager 조회
